@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Program Bantu</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <!-- Library Ekstrak ZIP & SQLite WASM -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/sql-wasm.js"></script>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen p-4 md:p-8">
+
+    <div class="max-w-4xl mx-auto bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-700">
+        <!-- Header -->
+        <div class="text-center border-b border-gray-700 pb-4 mb-6">
+            <h1 class="text-2xl font-bold text-yellow-400">📊 Dashboard Program Bantu</h1>
+            <p class="text-gray-400 text-xs mt-1">Segala Resiko di Tanggung Sendiri</p>
+        </div>
+
+        <!-- SECTION 1: UPLOAD FILE (Halaman Awal) -->
+        <div id="uploadSection" class="mb-6">
+            <div class="border-2 border-dashed border-gray-600 rounded-lg p-8 text-center bg-gray-700/50 hover:border-cyan-400 transition-colors">
+                <label class="block text-sm font-medium text-cyan-400 mb-4 cursor-pointer">
+                    📂 Pilih atau Taruh File ZIP Database di Sini:
+                </label>
+                <input type="file" id="zipInput" accept=".zip" 
+                       class="w-full max-w-xs mx-auto text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-cyan-600 file:text-white hover:file:bg-cyan-700 cursor-pointer bg-gray-800 rounded-lg p-1 border border-gray-600">
+            </div>
+        </div>
+
+        <!-- Status Loading -->
+        <div id="status" class="text-yellow-400 text-sm mb-4 hidden animate-pulse text-center font-semibold">⏳ Sedang memuat modul database...</div>
+
+        <!-- SECTION 2: PILIHAN MENU UTAMA (Muncul setelah upload sukses) -->
+        <div id="menuSection" class="hidden space-y-4 mb-6">
+            <h2 class="text-center text-lg font-semibold text-cyan-400 mb-4">Silakan Pilih Menu Analisis Data:</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <button onclick="switchMenu('setoran')" class="p-4 bg-gradient-to-br from-green-700 to-emerald-600 hover:from-green-600 hover:to-emerald-500 rounded-xl font-bold text-center transition-transform hover:scale-105 shadow-md">
+                    💰 1. Cek Setoran Kasir
+                </button>
+                <button onclick="switchMenu('member')" class="p-4 bg-gradient-to-br from-blue-700 to-cyan-600 hover:from-blue-600 hover:to-cyan-500 rounded-xl font-bold text-center transition-transform hover:scale-105 shadow-md">
+                    📱 2. Cek No HP Member
+                </button>
+                <button onclick="switchMenu('qty')" class="p-4 bg-gradient-to-br from-purple-700 to-indigo-600 hover:from-purple-600 hover:to-indigo-500 rounded-xl font-bold text-center transition-transform hover:scale-105 shadow-md">
+                    📦 3. Cek Qty Item Jual
+                </button>
+            </div>
+            <div class="text-center pt-4">
+                <button onclick="resetApp()" class="text-xs text-red-400 hover:underline">🔄 Ganti File Database (Reset)</button>
+            </div>
+        </div>
+
+        <!-- SECTION 3: AREA OUTPUT DATA (Masing-masing menu) -->
+        <div id="outputArea" class="hidden space-y-6">
+            
+            <!-- Tombol Kembali Global -->
+            <div class="flex justify-between items-center bg-gray-700/40 p-3 rounded-lg border border-gray-600">
+                <span id="currentMenuTitle" class="font-bold text-yellow-400"></span>
+                <button onclick="backToMenu()" class="px-4 py-1.5 bg-gray-600 hover:bg-gray-500 rounded-lg text-xs font-semibold">⬅️ Kembali ke Menu</button>
+            </div>
+
+            <!-- TAMPILAN MENU 1: SETORAN KASIR -->
+            <div id="panelSetoran" class="hidden space-y-6">
+                <div>
+                    <h3 class="text-md font-semibold text-green-400 mb-2">📋 Tabel 1: Informasi Kasir</h3>
+                    <div class="overflow-x-auto rounded-lg border border-gray-700">
+                        <table class="w-full text-left text-sm text-gray-300">
+                            <thead class="bg-gray-700 text-cyan-400 uppercase text-xs">
+                                <tr>
+                                    <th class="p-3">NIK Kasir</th>
+                                    <th class="p-3">Total Struk</th>
+                                    <th class="p-3">Struk Member</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tableKasirBody" class="divide-y divide-gray-700"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div>
+                    <h3 class="text-md font-semibold text-green-400 mb-2">💰 Tabel 2: Rincian Nominal Uang</h3>
+                    <div class="overflow-x-auto rounded-lg border border-gray-700">
+                        <table class="w-full text-left text-sm text-gray-300">
+                            <thead class="bg-gray-700 text-cyan-400 uppercase text-xs">
+                                <tr>
+                                    <th class="p-3">NIK</th>
+                                    <th class="p-3">Total Tunai</th>
+                                    <th class="p-3">Kartu</th>
+                                    <th class="p-3">Cash Out</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tableNominalBody" class="divide-y divide-gray-700"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div>
+                    <h3 class="text-md font-semibold text-green-400 mb-2">🎟️ Tabel 3: Rincian Delivery Order</h3>
+                    <div class="overflow-x-auto rounded-lg border border-gray-700">
+                        <table class="w-full text-left text-sm text-gray-300">
+                            <thead class="bg-gray-700 text-cyan-400 uppercase text-xs">
+                                <tr>
+                                    <th class="p-3">NIK</th>
+                                    <th class="p-3">Struk Delivery Order</th>
+                                    <th class="p-3">Total COD</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tableVoucherBody" class="divide-y divide-gray-700"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAMPILAN MENU 2: NO HP MEMBER (Template Kosong) -->
+            <div id="panelMember" class="hidden space-y-4">
+                <div class="bg-blue-900/20 border border-blue-700 p-4 rounded-xl text-center">
+                    <p class="text-blue-400 font-medium">Fungsi Cek No HP Member sedang dalam proses pembuatan. silakan coba lagi setelah tersedia</p>
+                </div>
+            </div>
+
+            <!-- TAMPILAN MENU 3: QTY ITEM JUAL (Template Kosong) -->
+            <div id="panelQty" class="hidden space-y-4">
+                <div class="bg-purple-900/20 border border-purple-700 p-4 rounded-xl text-center">
+                    <p class="text-purple-400 font-medium">Fungsi Cek Qty Item Jual sedang dikembangkan. silakan coba lagi setelah tersedia</p>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        const config = { locateFile: filename => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/${filename}` };
+        let activeDb = null; // Menyimpan database virtual secara global agar bisa dipakai gonta-ganti menu
+
+        document.getElementById('zipInput').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const statusDiv = document.getElementById('status');
+            statusDiv.classList.remove('hidden');
+
+            try {
+                const zip = await JSZip.loadAsync(file);
+                let dbFileBytes = null;
+
+                for (let filename in zip.files) {
+                    if (filename.endsWith('.db')) {
+                        dbFileBytes = await zip.files[filename].async("uint8array");
+                        break;
+                    }
+                }
+
+                if (!dbFileBytes) {
+                    alert("Gagal: Tidak ditemukan file database (.db) di dalam ZIP ini!");
+                    statusDiv.classList.add('hidden');
+                    return;
+                }
+
+                const SQL = await initSqlJs(config);
+                activeDb = new SQL.Database(dbFileBytes); // Simpan objek DB secara global
+
+                // Jalankan kalkulasi Menu 1 di awal background agar datanya langsung siap
+                prosesMenuSetoran();
+
+                // Ubah status Tampilan ke Menu Utama
+                statusDiv.classList.add('hidden');
+                document.getElementById('uploadSection').classList.add('hidden');
+                document.getElementById('menuSection').classList.remove('hidden');
+
+            } catch (err) {
+                console.error(err);
+                alert("Terjadi error saat membaca database.");
+                statusDiv.classList.add('hidden');
+            }
+        });
+
+        // Fungsi bawaan Menu 1 (Setoran Kasir) yang sudah diperbaiki sebelumnya
+        function prosesMenuSetoran() {
+            if(!activeDb) return;
+
+            // --- PROSES TABEL 1 ---
+            const query1 = `SELECT user_id, COUNT(*), SUM(CASE WHEN cust_id IS NOT NULL AND cust_id != '' THEN 1 ELSE 0 END) FROM tx_tsale GROUP BY user_id;`;
+            const res1 = activeDb.exec(query1)[0];
+            const t1Body = document.getElementById('tableKasirBody');
+            t1Body.innerHTML = "";
+            if(res1 && res1.values) {
+                res1.values.forEach(row => {
+                    t1Body.innerHTML += `<tr class="hover:bg-gray-700"><td class="p-3 font-mono">${row[0]}</td><td class="p-3">${row[1]}</td><td class="p-3">${row[2]}</td></tr>`;
+                });
+            }
+
+            // --- PROSES TABEL 2 ---
+            const query2 = `SELECT t.user_id, SUM(t.cash - t.change_pay), IFNULL((SELECT SUM(amount) FROM tx_tsale_card WHERE user_id = t.user_id), 0), IFNULL((SELECT SUM(cash_out) FROM tx_tsale_card WHERE user_id = t.user_id), 0) FROM tx_tsale t GROUP BY t.user_id;`;
+            const res2 = activeDb.exec(query2)[0];
+            const t2Body = document.getElementById('tableNominalBody');
+            t2Body.innerHTML = "";
+            if(res2 && res2.values) {
+                const formatRupiah = (val) => "Rp " + Number(val).toLocaleString('id-ID');
+                res2.values.forEach(row => {
+                    t2Body.innerHTML += `<tr class="hover:bg-gray-700"><td class="p-3 font-mono">${row[0]}</td><td class="p-3 text-emerald-400 font-bold">${formatRupiah(row[1])}</td><td class="p-3 text-cyan-400">${formatRupiah(row[2])}</td><td class="p-3 text-purple-400">${formatRupiah(row[3])}</td></tr>`;
+                });
+            }
+            
+            // --- PROSES TABEL 3 ---
+            const query3 = `SELECT user_id, SUM(CASE WHEN sender_nik IS NOT NULL AND sender_nik != '' THEN 1 ELSE 0 END) AS [Jml Struk], SUM(CASE WHEN sender_nik IS NOT NULL AND sender_nik != '' THEN (cash - change_pay) ELSE 0 END) AS [Total COD] FROM tx_tsale GROUP BY user_id;`;
+            const res3 = activeDb.exec(query3)[0];
+            const t3Body = document.getElementById('tableVoucherBody');
+            t3Body.innerHTML = "";
+            if(res3 && res3.values) {
+                const formatRupiah = (val) => "Rp " + Number(val).toLocaleString('id-ID');
+                res3.values.forEach(row => {
+                    t3Body.innerHTML += `<tr class="hover:bg-gray-700"><td class="p-3 font-mono">${row[0]}</td><td class="p-3">${row[1]}</td><td class="p-3 text-yellow-400 font-bold">${formatRupiah(row[2])}</td></tr>`;
+                });
+            }
+        }
+
+        // Navigasi Pindah Menu
+        function switchMenu(menuName) {
+            document.getElementById('menuSection').classList.add('hidden');
+            document.getElementById('outputArea').classList.remove('hidden');
+
+            // Sembunyikan semua panel data dulu
+            document.getElementById('panelSetoran').classList.add('hidden');
+            document.getElementById('panelMember').classList.add('hidden');
+            document.getElementById('panelQty').classList.add('hidden');
+
+            const titleSpan = document.getElementById('currentMenuTitle');
+
+            // Tampilkan panel sesuai pilihan
+            if (menuName === 'setoran') {
+                titleSpan.innerText = "💰 Analisis Setoran Kasir";
+                document.getElementById('panelSetoran').classList.remove('hidden');
+            } else if (menuName === 'member') {
+                titleSpan.innerText = "📱 Data No HP Member";
+                document.getElementById('panelMember').classList.remove('hidden');
+            } else if (menuName === 'qty') {
+                titleSpan.innerText = "📦 Data Qty Item Terjual";
+                document.getElementById('panelQty').classList.remove('hidden');
+            }
+        }
+
+        function backToMenu() {
+            document.getElementById('outputArea').classList.add('hidden');
+            document.getElementById('menuSection').classList.remove('hidden');
+        }
+
+        function resetApp() {
+            activeDb = null;
+            document.getElementById('zipInput').value = "";
+            document.getElementById('menuSection').classList.add('hidden');
+            document.getElementById('outputArea').classList.add('hidden');
+            document.getElementById('uploadSection').classList.remove('hidden');
+        }
+    </script>
+</body>
+</html>
