@@ -390,7 +390,7 @@
             }
         }
 
-        // PROSES MENU 4: LOGIKA REKAP PROMO PSM
+        // PROSES MENU 4: LOGIKA REKAP PROMO PSM (DENGAN PENANGANAN TEKS REFEFERENSI & LOGPROMO)
         async function prosesPromoPSM() {
             if(!activeDb) return;
 
@@ -398,7 +398,6 @@
             tbody.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-yellow-400 text-xs animate-pulse">⏳ Membaca psm.csv & memproses kueri...</td></tr>`;
 
             try {
-                // Deteksi jika dibuka langsung tanpa local server / GitHub Pages
                 if (window.location.protocol === 'file:') {
                     throw new Error("Pengujian lokal terdeteksi (file:///). Harap push file ke GitHub Pages agar browser dapat mengakses file psm.csv secara resmi.");
                 }
@@ -417,23 +416,39 @@
 
                 tbody.innerHTML = "";
 
-                // 2. Kueri SQL Presisi (Cek referensi & logpromo)
+                // 2. Deteksi otomatis kolom kuantitas di tx_trans
+                let qtyExpr = "COUNT(*)"; 
+                try {
+                    const tableInfo = activeDb.exec("PRAGMA table_info(tx_trans);")[0];
+                    if (tableInfo && tableInfo.values) {
+                        const cols = tableInfo.values.map(c => c[1].toLowerCase());
+                        if (cols.includes('qty')) qtyExpr = "SUM(CAST(qty AS NUMERIC))";
+                        else if (cols.includes('qty_all')) qtyExpr = "SUM(CAST(qty_all AS NUMERIC))";
+                        else if (cols.includes('quantity')) qtyExpr = "SUM(CAST(quantity AS NUMERIC))";
+                    }
+                } catch(e) {
+                    console.warn("Menggunakan fallback COUNT(*)");
+                }
+
+                // Kueri SQL Presisi:
+                // - TRIM PLU agar mencocokkan string presisi
+                // - referensi HARUS NULL atau KOSONG SETELAH DI-TRIM
+                // - logpromo HARUS TIDAK NULL dan TIDAK KOSONG SETELAH DI-TRIM
                 const sqlQuery = `
-                    SELECT COUNT(*) AS total_promo 
+                    SELECT IFNULL(${qtyExpr}, 0) AS total_promo 
                     FROM tx_trans 
-                    WHERE CAST(plu AS TEXT) = ?
-                      AND (referensi IS NULL OR referensi = '')
-                      AND (logpromo IS NOT NULL AND logpromo != '');
+                    WHERE TRIM(CAST(plu AS TEXT)) = TRIM(?)
+                      AND (referensi IS NULL OR TRIM(CAST(referensi AS TEXT)) = '')
+                      AND (logpromo IS NOT NULL AND TRIM(CAST(logpromo AS TEXT)) != '');
                 `;
 
                 const stmt = activeDb.prepare(sqlQuery);
 
-                // 3. Iterasi baris CSV (abaikan header indeks 0)
+                // 3. Parsing baris CSV (Lewati header A1/B1)
                 for (let i = 1; i < lines.length; i++) {
                     const rowStr = lines[i].trim();
                     if (!rowStr) continue;
 
-                    // Mengakomodasi pemisah koma (,) maupun titik koma (;)
                     const delimiter = rowStr.includes(';') ? ';' : ',';
                     const [pluCsv, namaItemCsv] = rowStr.split(delimiter);
 
@@ -442,7 +457,6 @@
 
                     if(!cleanPlu) continue;
 
-                    // Eksekusi Kueri Presisi
                     stmt.bind([cleanPlu]);
                     let totalPromo = 0;
 
@@ -455,7 +469,9 @@
                         <tr class="hover:bg-gray-700">
                             <td class="p-3 font-mono text-cyan-400 font-semibold">${cleanPlu}</td>
                             <td class="p-3 text-gray-200 font-medium">${cleanNama}</td>
-                            <td class="p-3 text-center font-bold text-yellow-400 text-base">${totalPromo} Pcs</td>
+                            <td class="p-3 text-center font-bold ${totalPromo > 0 ? 'text-yellow-400 font-extrabold text-base' : 'text-gray-500'}">
+                                ${Number(totalPromo).toLocaleString('id-ID')} Pcs
+                            </td>
                         </tr>
                     `;
                 }
