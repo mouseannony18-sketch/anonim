@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Program Bantu</title>
+    <title>Dashboard Ngintip Data - TakimichiMod</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <!-- Library Ekstrak ZIP & SQLite WASM -->
@@ -15,8 +15,8 @@
     <div class="max-w-4xl mx-auto bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-700">
         <!-- Header -->
         <div class="text-center border-b border-gray-700 pb-4 mb-6">
-            <h1 class="text-2xl font-bold text-yellow-400">📊 Dashboard Program Bantu</h1>
-            <p class="text-gray-400 text-xs mt-1">Segala Resiko di Tanggung Sendiri</p>
+            <h1 class="text-2xl font-bold text-yellow-400">📊 Dashboard Ngintip Data v2</h1>
+            <p class="text-gray-400 text-xs mt-1">by TakimichiMod</p>
         </div>
 
         <!-- SECTION 1: UPLOAD FILE (Halaman Awal) -->
@@ -33,10 +33,10 @@
         <!-- Status Loading -->
         <div id="status" class="text-yellow-400 text-sm mb-4 hidden animate-pulse text-center font-semibold">⏳ Sedang memuat modul database...</div>
 
-        <!-- SECTION 2: PILIHAN MENU UTAMA (Muncul setelah upload sukses) -->
+        <!-- SECTION 2: PILIHAN MENU UTAMA -->
         <div id="menuSection" class="hidden space-y-4 mb-6">
             <h2 class="text-center text-lg font-semibold text-cyan-400 mb-4">Silakan Pilih Menu Analisis Data:</h2>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <button onclick="switchMenu('setoran')" class="p-4 bg-gradient-to-br from-green-700 to-emerald-600 hover:from-green-600 hover:to-emerald-500 rounded-xl font-bold text-center transition-transform hover:scale-105 shadow-md">
                     💰 1. Cek Setoran Kasir
                 </button>
@@ -46,13 +46,16 @@
                 <button onclick="switchMenu('qty')" class="p-4 bg-gradient-to-br from-purple-700 to-indigo-600 hover:from-purple-600 hover:to-indigo-500 rounded-xl font-bold text-center transition-transform hover:scale-105 shadow-md">
                     📦 3. Cek Qty Item Jual
                 </button>
+                <button onclick="switchMenu('psm')" class="p-4 bg-gradient-to-br from-amber-700 to-yellow-600 hover:from-amber-600 hover:to-yellow-500 rounded-xl font-bold text-center transition-transform hover:scale-105 shadow-md">
+                    🏷️ 4. Rekap Promo PSM (CSV)
+                </button>
             </div>
             <div class="text-center pt-4">
                 <button onclick="resetApp()" class="text-xs text-red-400 hover:underline">🔄 Ganti File Database (Reset)</button>
             </div>
         </div>
 
-        <!-- SECTION 3: AREA OUTPUT DATA (Masing-masing menu) -->
+        <!-- SECTION 3: AREA OUTPUT DATA -->
         <div id="outputArea" class="hidden space-y-6">
             
             <!-- Tombol Kembali Global -->
@@ -111,17 +114,83 @@
                 </div>
             </div>
 
-            <!-- TAMPILAN MENU 2: NO HP MEMBER (Template Kosong) -->
+            <!-- TAMPILAN MENU 2: NO HP MEMBER -->
             <div id="panelMember" class="hidden space-y-4">
-                <div class="bg-blue-900/20 border border-blue-700 p-4 rounded-xl text-center">
-                    <p class="text-blue-400 font-medium">Fungsi Cek No HP Member sedang dalam proses pembuatan. silakan coba lagi setelah tersedia</p>
+                <div class="bg-gray-700/50 p-4 rounded-xl border border-gray-600">
+                    <label class="block text-xs font-semibold text-cyan-400 mb-2">🔍 Cari berdasarkan Nama Member atau Nomor Telepon:</label>
+                    <input type="text" id="memberSearchInput" oninput="cariMember()" placeholder="Ketik nama atau no HP..." 
+                           class="w-full p-2.5 bg-gray-800 border border-gray-600 rounded-lg text-sm text-white focus:outline-none focus:border-cyan-400 placeholder-gray-500">
+                </div>
+
+                <div class="overflow-x-auto rounded-lg border border-gray-700">
+                    <table class="w-full text-left text-sm text-gray-300">
+                        <thead class="bg-gray-700 text-cyan-400 uppercase text-xs">
+                            <tr>
+                                <th class="p-3">Nama Member</th>
+                                <th class="p-3">ID Member / Cust ID</th>
+                                <th class="p-3">Nomor Telepon</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableMemberBody" class="divide-y divide-gray-700">
+                            <tr>
+                                <td colspan="3" class="p-4 text-center text-gray-400 text-xs">Ketik kata kunci di atas untuk mencari data.</td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
 
-            <!-- TAMPILAN MENU 3: QTY ITEM JUAL (Template Kosong) -->
+            <!-- TAMPILAN MENU 3: QTY ITEM JUAL -->
             <div id="panelQty" class="hidden space-y-4">
-                <div class="bg-purple-900/20 border border-purple-700 p-4 rounded-xl text-center">
-                    <p class="text-purple-400 font-medium">Fungsi Cek Qty Item Jual sedang dikembangkan. silakan coba lagi setelah tersedia</p>
+                <div class="bg-gray-700/50 p-4 rounded-xl border border-gray-600 space-y-2">
+                    <label class="block text-xs font-semibold text-purple-400">🔍 Masukkan Kode PLU Barang:</label>
+                    <input type="text" id="pluSearchInput" oninput="cariQtyItem()" placeholder="Ketik Kode PLU barang..." 
+                           class="w-full p-2.5 bg-gray-800 border border-gray-600 rounded-lg text-sm text-white focus:outline-none focus:border-purple-400 placeholder-gray-500">
+                </div>
+
+                <div class="overflow-x-auto rounded-lg border border-gray-700">
+                    <table class="w-full text-left text-sm text-gray-300">
+                        <thead class="bg-gray-700 text-purple-400 uppercase text-xs">
+                            <tr>
+                                <th class="p-3">PLU Input</th>
+                                <th class="p-3">PLU di Database</th>
+                                <th class="p-3">Total Qty Terjual</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableQtyBody" class="divide-y divide-gray-700">
+                            <tr>
+                                <td colspan="3" class="p-4 text-center text-gray-400 text-xs">Ketik Kode PLU di atas untuk melihat total penjualan.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- TAMPILAN MENU 4: PROMO PSM -->
+            <div id="panelPsm" class="hidden space-y-4">
+                <div class="p-4 bg-yellow-900/30 border border-yellow-600/50 rounded-xl text-xs text-yellow-300 flex justify-between items-center">
+                    <div>
+                        <p class="font-bold">🏷️ Laporan Rekap Promo PSM</p>
+                        <p class="text-gray-400 mt-0.5">Mencocokkan <code class="text-yellow-400">psm.csv</code> ke tabel <code class="text-yellow-400">tx_trans</code>.</p>
+                    </div>
+                    <button onclick="prosesPromoPSM()" class="px-3 py-1.5 bg-yellow-600 hover:bg-yellow-500 text-white rounded-lg font-semibold text-xs">🔄 Refresh CSV</button>
+                </div>
+
+                <div class="overflow-x-auto rounded-lg border border-gray-700">
+                    <table class="w-full text-left text-sm text-gray-300">
+                        <thead class="bg-gray-700 text-yellow-400 uppercase text-xs">
+                            <tr>
+                                <th class="p-3">PLU</th>
+                                <th class="p-3">Deskripsi Barang (DESC)</th>
+                                <th class="p-3 text-center">Total Terjual Promo</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tablePsmBody" class="divide-y divide-gray-700">
+                            <tr>
+                                <td colspan="3" class="p-4 text-center text-gray-400 text-xs">Memuat data...</td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
 
@@ -130,7 +199,7 @@
 
     <script>
         const config = { locateFile: filename => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/${filename}` };
-        let activeDb = null; // Menyimpan database virtual secara global agar bisa dipakai gonta-ganti menu
+        let activeDb = null;
 
         document.getElementById('zipInput').addEventListener('change', async (e) => {
             const file = e.target.files[0];
@@ -157,12 +226,10 @@
                 }
 
                 const SQL = await initSqlJs(config);
-                activeDb = new SQL.Database(dbFileBytes); // Simpan objek DB secara global
+                activeDb = new SQL.Database(dbFileBytes);
 
-                // Jalankan kalkulasi Menu 1 di awal background agar datanya langsung siap
                 prosesMenuSetoran();
 
-                // Ubah status Tampilan ke Menu Utama
                 statusDiv.classList.add('hidden');
                 document.getElementById('uploadSection').classList.add('hidden');
                 document.getElementById('menuSection').classList.remove('hidden');
@@ -174,11 +241,10 @@
             }
         });
 
-        // Fungsi bawaan Menu 1 (Setoran Kasir) yang sudah diperbaiki sebelumnya
+        // PROSES MENU 1: SETORAN KASIR
         function prosesMenuSetoran() {
             if(!activeDb) return;
 
-            // --- PROSES TABEL 1 ---
             const query1 = `SELECT user_id, COUNT(*), SUM(CASE WHEN cust_id IS NOT NULL AND cust_id != '' THEN 1 ELSE 0 END) FROM tx_tsale GROUP BY user_id;`;
             const res1 = activeDb.exec(query1)[0];
             const t1Body = document.getElementById('tableKasirBody');
@@ -189,7 +255,6 @@
                 });
             }
 
-            // --- PROSES TABEL 2 ---
             const query2 = `SELECT t.user_id, SUM(t.cash - t.change_pay), IFNULL((SELECT SUM(amount) FROM tx_tsale_card WHERE user_id = t.user_id), 0), IFNULL((SELECT SUM(cash_out) FROM tx_tsale_card WHERE user_id = t.user_id), 0) FROM tx_tsale t GROUP BY t.user_id;`;
             const res2 = activeDb.exec(query2)[0];
             const t2Body = document.getElementById('tableNominalBody');
@@ -201,7 +266,6 @@
                 });
             }
             
-            // --- PROSES TABEL 3 ---
             const query3 = `SELECT user_id, SUM(CASE WHEN sender_nik IS NOT NULL AND sender_nik != '' THEN 1 ELSE 0 END) AS [Jml Struk], SUM(CASE WHEN sender_nik IS NOT NULL AND sender_nik != '' THEN (cash - change_pay) ELSE 0 END) AS [Total COD] FROM tx_tsale GROUP BY user_id;`;
             const res3 = activeDb.exec(query3)[0];
             const t3Body = document.getElementById('tableVoucherBody');
@@ -214,19 +278,216 @@
             }
         }
 
-        // Navigasi Pindah Menu
+        // PROSES MENU 2: SEARCHBOX REALTIME MEMBER
+        function cariMember() {
+            if(!activeDb) return;
+
+            const keyword = document.getElementById('memberSearchInput').value.trim();
+            const tbody = document.getElementById('tableMemberBody');
+
+            if(keyword === "") {
+                tbody.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-gray-400 text-xs">Ketik kata kunci di atas untuk mencari data.</td></tr>`;
+                return;
+            }
+
+            const query = `
+                SELECT DISTINCT
+                    u.member_name,
+                    u.no_member,
+                    s.phone
+                FROM tx_usi u
+                JOIN tx_tsale s ON u.no_member = s.cust_id
+                WHERE u.member_name LIKE '%' || ? || '%' 
+                   OR s.phone LIKE '%' || ? || '%'
+                LIMIT 50;
+            `;
+
+            try {
+                const stmt = activeDb.prepare(query);
+                stmt.bind([keyword, keyword]);
+
+                tbody.innerHTML = "";
+                let hasData = false;
+
+                while(stmt.step()) {
+                    hasData = true;
+                    const row = stmt.getAsObject();
+                    tbody.innerHTML += `
+                        <tr class="hover:bg-gray-700">
+                            <td class="p-3 font-semibold text-yellow-300">${row.member_name || '-'}</td>
+                            <td class="p-3 font-mono text-cyan-400">${row.no_member || '-'}</td>
+                            <td class="p-3 font-mono text-emerald-400">${row.phone || '-'}</td>
+                        </tr>
+                    `;
+                }
+                stmt.free();
+
+                if(!hasData) {
+                    tbody.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-red-400 text-xs">Data tidak ditemukan.</td></tr>`;
+                }
+
+            } catch (err) {
+                console.error(err);
+                tbody.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-red-400 text-xs">Gagal memproses pencarian.</td></tr>`;
+            }
+        }
+
+        // PROSES MENU 3: SEARCHBOX REALTIME QTY ITEM JUAL
+        function cariQtyItem() {
+            if(!activeDb) return;
+
+            const inputPlu = document.getElementById('pluSearchInput').value.trim();
+            const tbody = document.getElementById('tableQtyBody');
+
+            if(inputPlu === "") {
+                tbody.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-gray-400 text-xs">Ketik Kode PLU di atas untuk melihat total penjualan.</td></tr>`;
+                return;
+            }
+
+            const query = `
+                SELECT 
+                    plu AS db_raw_plu, 
+                    SUM(qty_all) AS total_qty 
+                FROM log_sales_cashier 
+                WHERE 
+                    CAST(plu AS TEXT) = ? 
+                    OR CAST(
+                        CASE 
+                            WHEN CAST(plu AS TEXT) LIKE '%2' THEN SUBSTR(CAST(plu AS TEXT), 1, LENGTH(CAST(plu AS TEXT)) - 1)
+                            ELSE CAST(plu AS TEXT)
+                        END AS TEXT
+                    ) = ?
+                GROUP BY db_raw_plu;
+            `;
+
+            try {
+                const stmt = activeDb.prepare(query);
+                stmt.bind([inputPlu, inputPlu]);
+
+                tbody.innerHTML = "";
+                let hasData = false;
+
+                while(stmt.step()) {
+                    hasData = true;
+                    const row = stmt.getAsObject();
+                    tbody.innerHTML += `
+                        <tr class="hover:bg-gray-700">
+                            <td class="p-3 font-mono text-gray-400">${inputPlu}</td>
+                            <td class="p-3 font-mono text-cyan-400 font-semibold">${row.db_raw_plu}</td>
+                            <td class="p-3 font-bold text-emerald-400 text-base">${Number(row.total_qty).toLocaleString('id-ID')} Pcs</td>
+                        </tr>
+                    `;
+                }
+                stmt.free();
+
+                if(!hasData) {
+                    tbody.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-red-400 text-xs">PLU "${inputPlu}" tidak ditemukan di tabel log penjualan.</td></tr>`;
+                }
+
+            } catch (err) {
+                console.error(err);
+                tbody.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-red-400 text-xs">Gagal memproses kueri PLU.</td></tr>`;
+            }
+        }
+
+        // PROSES MENU 4: LOGIKA REKAP PROMO PSM
+        async function prosesPromoPSM() {
+            if(!activeDb) return;
+
+            const tbody = document.getElementById('tablePsmBody');
+            tbody.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-yellow-400 text-xs animate-pulse">⏳ Membaca psm.csv & memproses kueri...</td></tr>`;
+
+            try {
+                // Deteksi jika dibuka langsung tanpa local server / GitHub Pages
+                if (window.location.protocol === 'file:') {
+                    throw new Error("Pengujian lokal terdeteksi (file:///). Harap push file ke GitHub Pages agar browser dapat mengakses file psm.csv secara resmi.");
+                }
+
+                // 1. Fetch File psm.csv
+                const response = await fetch('./psm.csv');
+                if(!response.ok) throw new Error(`File psm.csv tidak ditemukan (Status: ${response.status}). Pastikan file berada di folder yang sama.`);
+
+                const csvText = await response.text();
+                const lines = csvText.trim().split('\n');
+
+                if(lines.length <= 1) {
+                    tbody.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-red-400 text-xs">File psm.csv kosong atau tidak memiliki data.</td></tr>`;
+                    return;
+                }
+
+                tbody.innerHTML = "";
+
+                // 2. Kueri SQL Presisi (Cek referensi & logpromo)
+                const sqlQuery = `
+                    SELECT COUNT(*) AS total_promo 
+                    FROM tx_trans 
+                    WHERE CAST(plu AS TEXT) = ?
+                      AND (referensi IS NULL OR referensi = '')
+                      AND (logpromo IS NOT NULL AND logpromo != '');
+                `;
+
+                const stmt = activeDb.prepare(sqlQuery);
+
+                // 3. Iterasi baris CSV (abaikan header indeks 0)
+                for (let i = 1; i < lines.length; i++) {
+                    const rowStr = lines[i].trim();
+                    if (!rowStr) continue;
+
+                    // Mengakomodasi pemisah koma (,) maupun titik koma (;)
+                    const delimiter = rowStr.includes(';') ? ';' : ',';
+                    const [pluCsv, namaItemCsv] = rowStr.split(delimiter);
+
+                    const cleanPlu = pluCsv ? pluCsv.trim() : '';
+                    const cleanNama = namaItemCsv ? namaItemCsv.trim() : '-';
+
+                    if(!cleanPlu) continue;
+
+                    // Eksekusi Kueri Presisi
+                    stmt.bind([cleanPlu]);
+                    let totalPromo = 0;
+
+                    if (stmt.step()) {
+                        totalPromo = stmt.getAsObject().total_promo || 0;
+                    }
+                    stmt.reset();
+
+                    tbody.innerHTML += `
+                        <tr class="hover:bg-gray-700">
+                            <td class="p-3 font-mono text-cyan-400 font-semibold">${cleanPlu}</td>
+                            <td class="p-3 text-gray-200 font-medium">${cleanNama}</td>
+                            <td class="p-3 text-center font-bold text-yellow-400 text-base">${totalPromo} Pcs</td>
+                        </tr>
+                    `;
+                }
+
+                stmt.free();
+
+            } catch (err) {
+                console.error(err);
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="3" class="p-4">
+                            <div class="p-3 bg-red-950/50 border border-red-700/60 rounded-lg text-red-300 text-xs space-y-1">
+                                <p class="font-bold">⚠️ Gagal Memuat Data PSM:</p>
+                                <p>${err.message}</p>
+                            </div>
+                        </td>
+                    </tr>`;
+            }
+        }
+
+        // NAVIGASI PANEL MENU
         function switchMenu(menuName) {
             document.getElementById('menuSection').classList.add('hidden');
             document.getElementById('outputArea').classList.remove('hidden');
 
-            // Sembunyikan semua panel data dulu
             document.getElementById('panelSetoran').classList.add('hidden');
             document.getElementById('panelMember').classList.add('hidden');
             document.getElementById('panelQty').classList.add('hidden');
+            document.getElementById('panelPsm').classList.add('hidden');
 
             const titleSpan = document.getElementById('currentMenuTitle');
 
-            // Tampilkan panel sesuai pilihan
             if (menuName === 'setoran') {
                 titleSpan.innerText = "💰 Analisis Setoran Kasir";
                 document.getElementById('panelSetoran').classList.remove('hidden');
@@ -236,6 +497,10 @@
             } else if (menuName === 'qty') {
                 titleSpan.innerText = "📦 Data Qty Item Terjual";
                 document.getElementById('panelQty').classList.remove('hidden');
+            } else if (menuName === 'psm') {
+                titleSpan.innerText = "🏷️ Rekapitulasi Promo PSM";
+                document.getElementById('panelPsm').classList.remove('hidden');
+                prosesPromoPSM();
             }
         }
 
@@ -247,6 +512,8 @@
         function resetApp() {
             activeDb = null;
             document.getElementById('zipInput').value = "";
+            document.getElementById('memberSearchInput').value = "";
+            document.getElementById('pluSearchInput').value = "";
             document.getElementById('menuSection').classList.add('hidden');
             document.getElementById('outputArea').classList.add('hidden');
             document.getElementById('uploadSection').classList.remove('hidden');
