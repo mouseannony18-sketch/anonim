@@ -419,90 +419,105 @@
             }
         }
 
-        // PROSES UTAMA PROMO PSM (METODE SELISIH: LOGPROMO - REFERENSI PER PLU CSV)
-        async function hitungPromoPSM() {
-            if(!activeDb) return;
+        // PROSES UTAMA PROMO PSM (LOGIKA PENJUALAN TOKO MURNI: LOGPROMO - REFERENSI)
+async function hitungPromoPSM() {
+    if(!activeDb) return;
 
-            const cardCountEl = document.getElementById('totalPsmCount');
-            cardCountEl.innerText = "⏳ Memproses...";
+    const cardCountEl = document.getElementById('totalPsmCount');
+    cardCountEl.innerText = "⏳ Memproses...";
 
-            psmDataStore.totalQty = 0;
-            psmDataStore.validItems = [];
+    psmDataStore.totalQty = 0;
+    psmDataStore.validItems = [];
 
-            try {
-                // 1. Fetch File psm.csv dari folder web
-                const response = await fetch('./psm.csv');
-                if(!response.ok) {
-                    cardCountEl.innerText = "CSV Hilang";
-                    return;
-                }
+    try {
+        // 1. Fetch File psm.csv
+        const response = await fetch('./psm.csv');
+        if(!response.ok) {
+            cardCountEl.innerText = "CSV Hilang";
+            return;
+        }
 
-                const csvText = await response.text();
-                // Hapus karakter \r dari Windows/Excel
-                const cleanCsvText = csvText.replace(/\r/g, '').trim();
-                const lines = cleanCsvText.split('\n');
+        const csvText = await response.text();
+        const cleanCsvText = csvText.replace(/\r/g, '').trim();
+        const lines = cleanCsvText.split('\n');
 
-                if(lines.length <= 1) {
-                    cardCountEl.innerText = "0 Pcs";
-                    return;
-                }
+        if(lines.length <= 1) {
+            cardCountEl.innerText = "0 Pcs";
+            return;
+        }
 
-                // 2. Kueri SQL Pengurangan per PLU
-                // (Total Baris ber-logpromo) - (Total Baris ber-referensi)
-                const sqlQuery = `
-                    SELECT 
-                        SUM(CASE WHEN (logpromo IS NOT NULL AND TRIM(CAST(logpromo AS TEXT)) != '') THEN 1 ELSE 0 END) -
-                        SUM(CASE WHEN (referensi IS NOT NULL AND TRIM(CAST(referensi AS TEXT)) != '') THEN 1 ELSE 0 END) AS total_bersih
-                    FROM tx_trans
-                    WHERE TRIM(CAST(plu AS TEXT)) = TRIM(?);
-                `;
+        // 2. Kueri SQL Terpisah:
+        // total_logpromo = Semua baris yang logpromo-nya terisi
+        // total_referensi = Semua baris yang referensi-nya terisi
+        const sqlQuery = `
+            SELECT 
+                (
+                    SELECT COUNT(*) 
+                    FROM tx_trans 
+                    WHERE TRIM(CAST(plu AS TEXT)) = TRIM(?)
+                      AND (logpromo IS NOT NULL AND TRIM(CAST(logpromo AS TEXT)) != '')
+                ) AS total_logpromo,
+                (
+                    SELECT COUNT(*) 
+                    FROM tx_trans 
+                    WHERE TRIM(CAST(plu AS TEXT)) = TRIM(?)
+                      AND (referensi IS NOT NULL AND TRIM(CAST(referensi AS TEXT)) != '')
+                ) AS total_referensi;
+        `;
 
-                const stmt = activeDb.prepare(sqlQuery);
+        const stmt = activeDb.prepare(sqlQuery);
 
-                // 3. Iterasi Khusus PLU yang ada di File CSV
-                for (let i = 1; i < lines.length; i++) {
-                    const rowStr = lines[i].trim();
-                    if (!rowStr) continue;
+        // 3. Iterasi PLU dari File CSV
+        for (let i = 1; i < lines.length; i++) {
+            const rowStr = lines[i].trim();
+            if (!rowStr) continue;
 
-                    const delimiter = rowStr.includes(';') ? ';' : ',';
-                    const cols = rowStr.split(delimiter);
+            const delimiter = rowStr.includes(';') ? ';' : ',';
+            const cols = rowStr.split(delimiter);
 
-                    const cleanPlu = cols[0] ? cols[0].trim() : '';
-                    const cleanNama = cols[1] ? cols[1].trim() : '-';
+            const cleanPlu = cols[0] ? cols[0].trim() : '';
+            const cleanNama = cols[1] ? cols[1].trim() : '-';
 
-                    if(!cleanPlu) continue;
+            if(!cleanPlu) continue;
 
-                    // Bind PLU tunggal dari CSV ke Kueri SQL
-                    stmt.bind([cleanPlu]);
-                    let totalBersih = 0;
+            // Bind PLU dua kali (karena ada 2 subquery)
+            stmt.bind([cleanPlu, cleanPlu]);
+            
+            let totalLogpromo = 0;
+            let totalReferensi = 0;
 
-                    if (stmt.step()) {
-                        const res = stmt.getAsObject();
-                        totalBersih = res.total_bersih || 0;
-                    }
-                    stmt.reset();
+            if (stmt.step()) {
+                const res = stmt.getAsObject();
+                totalLogpromo = res.total_logpromo || 0;
+                totalReferensi = res.total_referensi || 0;
+            }
+            stmt.reset();
 
-                    // Jika selisihnya > 0, simpan ke data store
-                    if (totalBersih > 0) {
-                        psmDataStore.totalQty += totalBersih;
-                        psmDataStore.validItems.push({
-                            plu: cleanPlu,
-                            nama: cleanNama,
-                            qty: totalBersih
-                        });
-                    }
-                }
+            // Hitung Penjualan Toko Murni
+            const penjualanToko = totalLogpromo - totalReferensi;
 
-                stmt.free();
-
-                // 4. Tampilkan Total Akumulasi ke Kartu PSM
-                cardCountEl.innerText = `${psmDataStore.totalQty.toLocaleString('id-ID')} Pcs`;
-
-            } catch (err) {
-                console.error("Error saat menghitung PSM:", err);
-                cardCountEl.innerText = "Error Fetch";
+            // Jika ada penjualan toko (> 0)
+            if (penjualanToko > 0) {
+                psmDataStore.totalQty += penjualanToko;
+                psmDataStore.validItems.push({
+                    plu: cleanPlu,
+                    nama: cleanNama,
+                    qty: penjualanToko
+                });
             }
         }
+
+        stmt.free();
+
+        // 4. Update Angka ke Kartu Summary PSM
+        cardCountEl.innerText = `${psmDataStore.totalQty.toLocaleString('id-ID')} Pcs`;
+
+    } catch (err) {
+        console.error("Error saat menghitung PSM:", err);
+        cardCountEl.innerText = "Error Fetch";
+    }
+}
+
 
         // FUNGSI SAAT KARTU PSM DIKLIK -> TAMPILKAN DETAIL TABEL
         function tampilkanDetailPsm() {
