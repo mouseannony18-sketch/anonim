@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Ngintip Data - TakimichiMod</title>
+    <title>Dashboard Ngintip Data 2 - TakimichiMod</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <!-- Library Ekstrak ZIP & SQLite WASM -->
@@ -46,8 +46,8 @@
                 <button onclick="switchMenu('qty')" class="p-4 bg-gradient-to-br from-purple-700 to-indigo-600 hover:from-purple-600 hover:to-indigo-500 rounded-xl font-bold text-center transition-transform hover:scale-105 shadow-md">
                     📦 3. Cek Qty Item Jual
                 </button>
-                <button onclick="switchMenu('psm')" class="p-4 bg-gradient-to-br from-amber-700 to-yellow-600 hover:from-amber-600 hover:to-yellow-500 rounded-xl font-bold text-center transition-transform hover:scale-105 shadow-md">
-                    🏷️ 4. Rekap Promo PSM (CSV)
+                <button onclick="switchMenu('promoSummary')" class="p-4 bg-gradient-to-br from-amber-700 to-yellow-600 hover:from-amber-600 hover:to-yellow-500 rounded-xl font-bold text-center transition-transform hover:scale-105 shadow-md">
+                    🏷️ 4. Rekap Penjualan Item Promo
                 </button>
             </div>
             <div class="text-center pt-4">
@@ -144,8 +144,14 @@
             <div id="panelQty" class="hidden space-y-4">
                 <div class="bg-gray-700/50 p-4 rounded-xl border border-gray-600 space-y-2">
                     <label class="block text-xs font-semibold text-purple-400">🔍 Masukkan Kode PLU Barang:</label>
-                    <input type="text" id="pluSearchInput" oninput="cariQtyItem()" placeholder="Ketik Kode PLU barang..." 
+                    <input type="text" id="pluSearchInput" oninput="cariQtyItem()" placeholder="Ketik Kode PLU barang (misal: 2622)..." 
                            class="w-full p-2.5 bg-gray-800 border border-gray-600 rounded-lg text-sm text-white focus:outline-none focus:border-purple-400 placeholder-gray-500">
+                    
+                    <div class="p-3 bg-yellow-900/30 border border-yellow-600/50 rounded-lg text-xs text-yellow-300 space-y-1">
+                        <p class="font-bold flex items-center gap-1">💡 Petunjuk & Saran:</p>
+                        <p>1. Sistem secara otomatis memotong angka <code class="bg-gray-800 px-1 py-0.5 rounded text-yellow-400 font-mono">2</code> tambahan di akhir kolom PLU database agar cocok dengan pencarian Anda.</p>
+                        <p>2. Pastikan mencocokkan Kode PLU dan Nama Barang di komputer POS toko untuk verifikasi akhir.</p>
+                    </div>
                 </div>
 
                 <div class="overflow-x-auto rounded-lg border border-gray-700">
@@ -166,31 +172,48 @@
                 </div>
             </div>
 
-            <!-- TAMPILAN MENU 4: PROMO PSM -->
-            <div id="panelPsm" class="hidden space-y-4">
-                <div class="p-4 bg-yellow-900/30 border border-yellow-600/50 rounded-xl text-xs text-yellow-300 flex justify-between items-center">
-                    <div>
-                        <p class="font-bold">🏷️ Laporan Rekap Promo PSM</p>
-                        <p class="text-gray-400 mt-0.5">Mencocokkan <code class="text-yellow-400">psm.csv</code> ke tabel <code class="text-yellow-400">tx_trans</code>.</p>
+            <!-- TAMPILAN MENU 4: MENU REKAP PROMO (KARTU SUMMARY & DETAIL) -->
+            <div id="panelPromoSummary" class="hidden space-y-6">
+                <!-- GRID KARTU SUMMARY PROMO -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <!-- KARTU PROMO PSM -->
+                    <div onclick="tampilkanDetailPsm()" class="p-5 bg-gradient-to-br from-amber-900/40 to-yellow-800/30 hover:from-amber-800/60 hover:to-yellow-700/50 border border-yellow-600/50 rounded-xl cursor-pointer transition-all shadow-md group">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-xs font-bold text-yellow-400 tracking-wider">🏷️ PROMO PSM</span>
+                            <span class="text-[10px] bg-yellow-500/20 text-yellow-300 px-2 py-0.5 rounded-full border border-yellow-500/30 group-hover:bg-yellow-500 group-hover:text-black transition-colors">Klik Detail ➔</span>
+                        </div>
+                        <p id="totalPsmCount" class="text-2xl font-extrabold text-white">0 Pcs</p>
+                        <p class="text-[11px] text-gray-400 mt-1">Total akumulasi item memenuhi syarat PSM</p>
                     </div>
-                    <button onclick="prosesPromoPSM()" class="px-3 py-1.5 bg-yellow-600 hover:bg-yellow-500 text-white rounded-lg font-semibold text-xs">🔄 Refresh CSV</button>
                 </div>
 
-                <div class="overflow-x-auto rounded-lg border border-gray-700">
-                    <table class="w-full text-left text-sm text-gray-300">
-                        <thead class="bg-gray-700 text-yellow-400 uppercase text-xs">
-                            <tr>
-                                <th class="p-3">PLU</th>
-                                <th class="p-3">Deskripsi Barang (DESC)</th>
-                                <th class="p-3 text-center">Total Terjual Promo</th>
-                            </tr>
-                        </thead>
-                        <tbody id="tablePsmBody" class="divide-y divide-gray-700">
-                            <tr>
-                                <td colspan="3" class="p-4 text-center text-gray-400 text-xs">Memuat data...</td>
-                            </tr>
-                        </tbody>
-                    </table>
+                <!-- AREA DETAIL TABEL PSM (TAMPIL SETELAH KARTU DIKLIK) -->
+                <div id="detailPsmSection" class="hidden bg-gray-800 rounded-xl border border-gray-700 p-4 space-y-3">
+                    <div class="flex justify-between items-center border-b border-gray-700 pb-2">
+                        <h3 class="text-sm font-bold text-yellow-400 flex items-center gap-1.5">
+                            📋 Rincian Item Promo PSM yang Terjual
+                        </h3>
+                        <span id="detailItemCountBadge" class="text-xs px-2 py-0.5 bg-yellow-900/50 border border-yellow-600/40 rounded text-yellow-300 font-mono">
+                            0 Item
+                        </span>
+                    </div>
+
+                    <div class="overflow-x-auto rounded-lg border border-gray-700">
+                        <table class="w-full text-left text-sm text-gray-300">
+                            <thead class="bg-gray-700 text-yellow-400 uppercase text-xs">
+                                <tr>
+                                    <th class="p-3">PLU</th>
+                                    <th class="p-3">Deskripsi Barang (DESC)</th>
+                                    <th class="p-3 text-center">Total Terjual (PSM)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tablePsmDetailBody" class="divide-y divide-gray-700">
+                                <tr>
+                                    <td colspan="3" class="p-4 text-center text-gray-400 text-xs">Memuat data...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
 
@@ -200,6 +223,12 @@
     <script>
         const config = { locateFile: filename => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/${filename}` };
         let activeDb = null;
+
+        // Penyimpanan Data PSM Terproses
+        let psmDataStore = {
+            totalQty: 0,
+            validItems: []
+        };
 
         document.getElementById('zipInput').addEventListener('change', async (e) => {
             const file = e.target.files[0];
@@ -390,61 +419,44 @@
             }
         }
 
-        // PROSES MENU 4: LOGIKA REKAP PROMO PSM (DENGAN PENANGANAN TEKS REFEFERENSI & LOGPROMO)
-        async function prosesPromoPSM() {
+        // PROSES UTAMA PROMO PSM (LOGIKA BARU SESUAI INSTRUKSI)
+        async function hitungPromoPSM() {
             if(!activeDb) return;
 
-            const tbody = document.getElementById('tablePsmBody');
-            tbody.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-yellow-400 text-xs animate-pulse">⏳ Membaca psm.csv & memproses kueri...</td></tr>`;
+            const cardCountEl = document.getElementById('totalPsmCount');
+            cardCountEl.innerText = "⏳ Memproses...";
+
+            psmDataStore.totalQty = 0;
+            psmDataStore.validItems = [];
 
             try {
-                if (window.location.protocol === 'file:') {
-                    throw new Error("Pengujian lokal terdeteksi (file:///). Harap push file ke GitHub Pages agar browser dapat mengakses file psm.csv secara resmi.");
-                }
-
                 // 1. Fetch File psm.csv
                 const response = await fetch('./psm.csv');
-                if(!response.ok) throw new Error(`File psm.csv tidak ditemukan (Status: ${response.status}). Pastikan file berada di folder yang sama.`);
+                if(!response.ok) throw new Error("File psm.csv tidak ditemukan di folder.");
 
                 const csvText = await response.text();
                 const lines = csvText.trim().split('\n');
 
                 if(lines.length <= 1) {
-                    tbody.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-red-400 text-xs">File psm.csv kosong atau tidak memiliki data.</td></tr>`;
+                    cardCountEl.innerText = "0 Pcs";
                     return;
                 }
 
-                tbody.innerHTML = "";
-
-                // 2. Deteksi otomatis kolom kuantitas di tx_trans
-                let qtyExpr = "COUNT(*)"; 
-                try {
-                    const tableInfo = activeDb.exec("PRAGMA table_info(tx_trans);")[0];
-                    if (tableInfo && tableInfo.values) {
-                        const cols = tableInfo.values.map(c => c[1].toLowerCase());
-                        if (cols.includes('qty')) qtyExpr = "SUM(CAST(qty AS NUMERIC))";
-                        else if (cols.includes('qty_all')) qtyExpr = "SUM(CAST(qty_all AS NUMERIC))";
-                        else if (cols.includes('quantity')) qtyExpr = "SUM(CAST(quantity AS NUMERIC))";
-                    }
-                } catch(e) {
-                    console.warn("Menggunakan fallback COUNT(*)");
-                }
-
-                // Kueri SQL Presisi:
-                // - TRIM PLU agar mencocokkan string presisi
-                // - referensi HARUS NULL atau KOSONG SETELAH DI-TRIM
-                // - logpromo HARUS TIDAK NULL dan TIDAK KOSONG SETELAH DI-TRIM
+                // 2. Kueri SQL Sesuai Logika Persyaratan Anda:
+                // - Cocokkan PLU
+                // - logpromo ADA ISINYA (NOT NULL & != '')
+                // - referensi ADA ISINYA (NOT NULL & != '')
                 const sqlQuery = `
-                    SELECT IFNULL(${qtyExpr}, 0) AS total_promo 
+                    SELECT COUNT(*) AS total_terjual 
                     FROM tx_trans 
-                    WHERE TRIM(CAST(plu AS TEXT)) = TRIM(?)
-                      AND (referensi IS NULL OR TRIM(CAST(referensi AS TEXT)) = '')
-                      AND (logpromo IS NOT NULL AND TRIM(CAST(logpromo AS TEXT)) != '');
+                    WHERE CAST(plu AS TEXT) = ?
+                      AND (logpromo IS NOT NULL AND TRIM(CAST(logpromo AS TEXT)) != '')
+                      AND (referensi IS NOT NULL AND TRIM(CAST(referensi AS TEXT)) != '');
                 `;
 
                 const stmt = activeDb.prepare(sqlQuery);
 
-                // 3. Parsing baris CSV (Lewati header A1/B1)
+                // 3. Iterasi baris CSV (Abaikan header index 0)
                 for (let i = 1; i < lines.length; i++) {
                     const rowStr = lines[i].trim();
                     if (!rowStr) continue;
@@ -458,38 +470,63 @@
                     if(!cleanPlu) continue;
 
                     stmt.bind([cleanPlu]);
-                    let totalPromo = 0;
+                    let countItem = 0;
 
                     if (stmt.step()) {
-                        totalPromo = stmt.getAsObject().total_promo || 0;
+                        countItem = stmt.getAsObject().total_terjual || 0;
                     }
                     stmt.reset();
 
-                    tbody.innerHTML += `
-                        <tr class="hover:bg-gray-700">
-                            <td class="p-3 font-mono text-cyan-400 font-semibold">${cleanPlu}</td>
-                            <td class="p-3 text-gray-200 font-medium">${cleanNama}</td>
-                            <td class="p-3 text-center font-bold ${totalPromo > 0 ? 'text-yellow-400 font-extrabold text-base' : 'text-gray-500'}">
-                                ${Number(totalPromo).toLocaleString('id-ID')} Pcs
-                            </td>
-                        </tr>
-                    `;
+                    // Jika item ini terjual dan memenuhi syarat (countItem > 0)
+                    if (countItem > 0) {
+                        psmDataStore.totalQty += countItem;
+                        psmDataStore.validItems.push({
+                            plu: cleanPlu,
+                            nama: cleanNama,
+                            qty: countItem
+                        });
+                    }
                 }
 
                 stmt.free();
 
+                // 4. Update Angka di Kartu Summary PSM
+                cardCountEl.innerText = `${psmDataStore.totalQty.toLocaleString('id-ID')} Pcs`;
+
             } catch (err) {
                 console.error(err);
-                tbody.innerHTML = `
-                    <tr>
-                        <td colspan="3" class="p-4">
-                            <div class="p-3 bg-red-950/50 border border-red-700/60 rounded-lg text-red-300 text-xs space-y-1">
-                                <p class="font-bold">⚠️ Gagal Memuat Data PSM:</p>
-                                <p>${err.message}</p>
-                            </div>
-                        </td>
-                    </tr>`;
+                cardCountEl.innerText = "Error CSV";
             }
+        }
+
+        // FUNGSI SAAT KARTU PSM DIKLIK -> TAMPILKAN TABEL DETAIL
+        function tampilkanDetailPsm() {
+            const detailSection = document.getElementById('detailPsmSection');
+            const tbody = document.getElementById('tablePsmDetailBody');
+            const badgeEl = document.getElementById('detailItemCountBadge');
+
+            detailSection.classList.remove('hidden');
+            tbody.innerHTML = "";
+
+            if (psmDataStore.validItems.length === 0) {
+                badgeEl.innerText = "0 Item";
+                tbody.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-gray-400 text-xs">Tidak ada item promo PSM yang memenuhi syarat transaksi di database ini.</td></tr>`;
+                return;
+            }
+
+            badgeEl.innerText = `${psmDataStore.validItems.length} Jenis Item Terjual`;
+
+            psmDataStore.validItems.forEach(item => {
+                tbody.innerHTML += `
+                    <tr class="hover:bg-gray-700">
+                        <td class="p-3 font-mono text-cyan-400 font-semibold">${item.plu}</td>
+                        <td class="p-3 text-gray-200 font-medium">${item.nama}</td>
+                        <td class="p-3 text-center font-bold text-yellow-400 text-base">
+                            ${item.qty.toLocaleString('id-ID')} Pcs
+                        </td>
+                    </tr>
+                `;
+            });
         }
 
         // NAVIGASI PANEL MENU
@@ -500,7 +537,7 @@
             document.getElementById('panelSetoran').classList.add('hidden');
             document.getElementById('panelMember').classList.add('hidden');
             document.getElementById('panelQty').classList.add('hidden');
-            document.getElementById('panelPsm').classList.add('hidden');
+            document.getElementById('panelPromoSummary').classList.add('hidden');
 
             const titleSpan = document.getElementById('currentMenuTitle');
 
@@ -513,16 +550,18 @@
             } else if (menuName === 'qty') {
                 titleSpan.innerText = "📦 Data Qty Item Terjual";
                 document.getElementById('panelQty').classList.remove('hidden');
-            } else if (menuName === 'psm') {
-                titleSpan.innerText = "🏷️ Rekapitulasi Promo PSM";
-                document.getElementById('panelPsm').classList.remove('hidden');
-                prosesPromoPSM();
+            } else if (menuName === 'promoSummary') {
+                titleSpan.innerText = "🏷️ Rekapitulasi Penjualan Promo";
+                document.getElementById('panelPromoSummary').classList.remove('hidden');
+                hitungPromoPSM(); // Otomatis kalkulasi angka kartu PSM
             }
         }
 
         function backToMenu() {
             document.getElementById('outputArea').classList.add('hidden');
             document.getElementById('menuSection').classList.remove('hidden');
+            // Sembunyikan tabel detail saat kembali ke menu
+            document.getElementById('detailPsmSection').classList.add('hidden');
         }
 
         function resetApp() {
@@ -533,6 +572,7 @@
             document.getElementById('menuSection').classList.add('hidden');
             document.getElementById('outputArea').classList.add('hidden');
             document.getElementById('uploadSection').classList.remove('hidden');
+            document.getElementById('detailPsmSection').classList.add('hidden');
         }
     </script>
 </body>
