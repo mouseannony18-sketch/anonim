@@ -15,7 +15,7 @@
     <div class="max-w-4xl mx-auto bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-700">
         <!-- Header -->
         <div class="text-center border-b border-gray-700 pb-4 mb-6">
-            <h1 class="text-2xl font-bold text-yellow-400">📊 Dashboard Program Bantu v2</h1>
+            <h1 class="text-2xl font-bold text-yellow-400">📊 Dashboard Ngintipv2</h1>
             <p class="text-gray-400 text-xs mt-1">by TakimichiMod</p>
         </div>
 
@@ -182,8 +182,8 @@
                             <span class="text-xs font-bold text-yellow-400 tracking-wider">🏷️ PROMO PSM</span>
                             <span class="text-[10px] bg-yellow-500/20 text-yellow-300 px-2 py-0.5 rounded-full border border-yellow-500/30 group-hover:bg-yellow-500 group-hover:text-black transition-colors">Klik Detail ➔</span>
                         </div>
-                        <p id="totalPsmCount" class="text-2xl font-extrabold text-white">0 Pcs</p>
-                        <p class="text-[11px] text-gray-400 mt-1">Total Qty penjualan toko murni (referensi kosong)</p>
+                        <p id="totalPsmCount" class="text-2xl font-extrabold text-white">0 Paket</p>
+                        <p class="text-[11px] text-gray-400 mt-1">Total akumulasi paket promo per nomor struk (bill_no)</p>
                     </div>
                 </div>
 
@@ -191,10 +191,10 @@
                 <div id="detailPsmSection" class="hidden bg-gray-800 rounded-xl border border-gray-700 p-4 space-y-3">
                     <div class="flex justify-between items-center border-b border-gray-700 pb-2">
                         <h3 class="text-sm font-bold text-yellow-400 flex items-center gap-1.5">
-                            📋 Rincian Item Promo PSM yang Terjual
+                            📋 Rincian Paket Promo PSM yang Terjual
                         </h3>
                         <span id="detailItemCountBadge" class="text-xs px-2 py-0.5 bg-yellow-900/50 border border-yellow-600/40 rounded text-yellow-300 font-mono">
-                            0 Item
+                            0 Kelompok Promo
                         </span>
                     </div>
 
@@ -202,9 +202,9 @@
                         <table class="w-full text-left text-sm text-gray-300">
                             <thead class="bg-gray-700 text-yellow-400 uppercase text-xs">
                                 <tr>
-                                    <th class="p-3">PLU</th>
-                                    <th class="p-3">Deskripsi Barang (DESC)</th>
-                                    <th class="p-3 text-center">Total Qty Terjual</th>
+                                    <th class="p-3">Grup Promo (GROUP_ID)</th>
+                                    <th class="p-3">Deskripsi Produk</th>
+                                    <th class="p-3 text-center">Total Paket Terjual</th>
                                 </tr>
                             </thead>
                             <tbody id="tablePsmDetailBody" class="divide-y divide-gray-700">
@@ -225,8 +225,8 @@
         let activeDb = null;
 
         let psmDataStore = {
-            totalQty: 0,
-            validItems: []
+            totalPromoPackages: 0,
+            groupResults: []
         };
 
         document.getElementById('zipInput').addEventListener('change', async (e) => {
@@ -381,15 +381,15 @@
             }
         }
 
-        // PROSES UTAMA PROMO PSM (HANYA CEK REFERENSI KOSONG & SUM KOLOM QTY)
+        // LOGIKA ADVANCED: HANDLING PROMO B2G1 & PROMO SILANG (BUY X GET Y) PER STRUK (bill_no)
         async function hitungPromoPSM() {
             if(!activeDb) return;
 
             const cardCountEl = document.getElementById('totalPsmCount');
             cardCountEl.innerText = "⏳ Memproses...";
 
-            psmDataStore.totalQty = 0;
-            psmDataStore.validItems = [];
+            psmDataStore.totalPromoPackages = 0;
+            psmDataStore.groupResults = [];
 
             try {
                 const response = await fetch('./psm.csv');
@@ -403,25 +403,12 @@
                 const lines = cleanCsvText.split('\n');
 
                 if(lines.length <= 1) {
-                    cardCountEl.innerText = "0 Pcs";
+                    cardCountEl.innerText = "0 Paket";
                     return;
                 }
 
-                // Kueri SQL Baru:
-                // 1. Cocokkan PLU dari CSV (termasuk pemotongan angka '2' di akhir jika ada)
-                // 2. Cek kolom referensi HARUS KOSONG (NULL atau '')
-                // 3. Jumlahkan total kuantitas dari kolom qty
-                const sqlQuery = `
-                    SELECT IFNULL(SUM(CAST(qty AS NUMERIC)), 0) AS total_qty 
-                    FROM tx_trans 
-                    WHERE (
-                        CAST(plu AS TEXT) = ? 
-                        OR CAST(CASE WHEN CAST(plu AS TEXT) LIKE '%2' THEN SUBSTR(CAST(plu AS TEXT), 1, LENGTH(CAST(plu AS TEXT)) - 1) ELSE CAST(plu AS TEXT) END AS TEXT) = ?
-                    )
-                    AND (referensi IS NULL OR TRIM(CAST(referensi AS TEXT)) = '');
-                `;
-
-                const stmt = activeDb.prepare(sqlQuery);
+                // 1. Parsing Struktur CSV Baru (GROUP_ID, ROLE, TARGET_QTY)
+                const groupsMap = {};
 
                 for (let i = 1; i < lines.length; i++) {
                     const rowStr = lines[i].trim();
@@ -432,30 +419,115 @@
 
                     const cleanPlu = cols[0] ? cols[0].trim() : '';
                     const cleanNama = cols[1] ? cols[1].trim() : '-';
+                    const groupId = cols[2] ? cols[2].trim() : cleanPlu;
+                    const role = cols[3] ? cols[3].trim().toUpperCase() : 'BUY'; // 'BUY' atau 'GET'
+                    const targetQty = cols[4] ? parseInt(cols[4].trim()) || 1 : 1;
 
                     if(!cleanPlu) continue;
 
-                    stmt.bind([cleanPlu, cleanPlu]);
-                    let itemQty = 0;
-
-                    if (stmt.step()) {
-                        itemQty = stmt.getAsObject().total_qty || 0;
+                    if (!groupsMap[groupId]) {
+                        groupsMap[groupId] = {
+                            groupId: groupId,
+                            buyPlus: [],
+                            getPlus: [],
+                            buyTarget: 1,
+                            getTarget: 1,
+                            descs: []
+                        };
                     }
-                    stmt.reset();
 
-                    if (itemQty > 0) {
-                        psmDataStore.totalQty += itemQty;
-                        psmDataStore.validItems.push({
-                            plu: cleanPlu,
-                            nama: cleanNama,
-                            qty: itemQty
+                    if (role === 'GET') {
+                        groupsMap[groupId].getPlus.push(cleanPlu);
+                        groupsMap[groupId].getTarget = targetQty;
+                    } else {
+                        groupsMap[groupId].buyPlus.push(cleanPlu);
+                        groupsMap[groupId].buyTarget = targetQty;
+                    }
+
+                    groupsMap[groupId].descs.push(cleanNama);
+                }
+
+                // 2. Kueri SQL Evaluasi Per Group ID & Bill No
+                for (const groupId in groupsMap) {
+                    const group = groupsMap[groupId];
+                    const isCrossPromo = group.getPlus.length > 0; // Cek apakah ada barang bonus terpisah
+
+                    const allPlus = [...group.buyPlus, ...group.getPlus];
+                    const pluPlaceholders = allPlus.map(() => '?').join(',');
+
+                    // Ambil detail transaksi per bill_no untuk item-item yang masuk dalam grup ini
+                    const sqlQuery = `
+                        SELECT 
+                            bill_no,
+                            CAST(plu AS TEXT) AS raw_plu,
+                            SUM(CAST(qty AS NUMERIC)) AS item_qty
+                        FROM tx_trans
+                        WHERE (
+                            CAST(plu AS TEXT) IN (${pluPlaceholders})
+                            OR CAST(CASE WHEN CAST(plu AS TEXT) LIKE '%2' THEN SUBSTR(CAST(plu AS TEXT), 1, LENGTH(CAST(plu AS TEXT)) - 1) ELSE CAST(plu AS TEXT) END AS TEXT) IN (${pluPlaceholders})
+                        )
+                        AND (referensi IS NULL OR TRIM(CAST(referensi AS TEXT)) = '')
+                        GROUP BY bill_no, raw_plu;
+                    `;
+
+                    const stmt = activeDb.prepare(sqlQuery);
+                    stmt.bind([...allPlus, ...allPlus]);
+
+                    // Map menampung qty per bill_no: { 'STRUK123': { buyQty: 2, getQty: 1 } }
+                    const billMap = {};
+
+                    while (stmt.step()) {
+                        const row = stmt.getAsObject();
+                        const billNo = row.bill_no;
+                        const qty = row.item_qty || 0;
+                        let cleanPlu = row.raw_plu;
+
+                        if (cleanPlu.endsWith('2')) cleanPlu = cleanPlu.slice(0, -1);
+
+                        if (!billMap[billNo]) {
+                            billMap[billNo] = { buyQty: 0, getQty: 0 };
+                        }
+
+                        if (group.buyPlus.includes(cleanPlu)) {
+                            billMap[billNo].buyQty += qty;
+                        } else if (group.getPlus.includes(cleanPlu)) {
+                            billMap[billNo].getQty += qty;
+                        }
+                    }
+                    stmt.free();
+
+                    // Hitung Paket Promo Per Struk
+                    let totalGroupPackages = 0;
+
+                    for (const billNo in billMap) {
+                        const data = billMap[billNo];
+
+                        if (isCrossPromo) {
+                            // Promo Beli A Gratis B (Beli 2 Tango + Gratis 1 Taro)
+                            const buyPacks = Math.floor(data.buyQty / group.buyTarget);
+                            const getPacks = Math.floor(data.getQty / group.getTarget);
+                            // Ambil kuota terendah yang terpenuhi di struk
+                            const validPacks = Math.min(buyPacks, getPacks);
+                            totalGroupPackages += validPacks;
+                        } else {
+                            // Promo Biasa / B2G1 Sejenis (Pakai buyTarget)
+                            if (data.buyQty >= group.buyTarget) {
+                                totalGroupPackages += Math.floor(data.buyQty / group.buyTarget);
+                            }
+                        }
+                    }
+
+                    if (totalGroupPackages > 0) {
+                        psmDataStore.totalPromoPackages += totalGroupPackages;
+                        psmDataStore.groupResults.push({
+                            groupId: group.groupId,
+                            descs: group.descs.join(' / '),
+                            packages: totalGroupPackages
                         });
                     }
                 }
 
-                stmt.free();
-
-                cardCountEl.innerText = `${psmDataStore.totalQty.toLocaleString('id-ID')} Pcs`;
+                cardCountEl.innerText = `${psmDataStore.totalPromoPackages.toLocaleString('id-ID')} Paket Promo`;
 
             } catch (err) {
                 console.error("Error saat menghitung PSM:", err);
@@ -471,21 +543,21 @@
             detailSection.classList.remove('hidden');
             tbody.innerHTML = "";
 
-            if (psmDataStore.validItems.length === 0) {
-                badgeEl.innerText = "0 Item";
-                tbody.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-gray-400 text-xs">Tidak ada item promo PSM dari psm.csv yang terdeteksi di database ini.</td></tr>`;
+            if (psmDataStore.groupResults.length === 0) {
+                badgeEl.innerText = "0 Kelompok Promo";
+                tbody.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-gray-400 text-xs">Tidak ada paket promo PSM yang memenuhi syarat per nomor struk (bill_no) di database ini.</td></tr>`;
                 return;
             }
 
-            badgeEl.innerText = `${psmDataStore.validItems.length} Jenis Item Terjual`;
+            badgeEl.innerText = `${psmDataStore.groupResults.length} Kelompok Promo Terjual`;
 
-            psmDataStore.validItems.forEach(item => {
+            psmDataStore.groupResults.forEach(group => {
                 tbody.innerHTML += `
                     <tr class="hover:bg-gray-700">
-                        <td class="p-3 font-mono text-cyan-400 font-semibold">${item.plu}</td>
-                        <td class="p-3 text-gray-200 font-medium">${item.nama}</td>
+                        <td class="p-3 font-mono text-cyan-400 font-semibold">${group.groupId}</td>
+                        <td class="p-3 text-gray-200 font-medium text-xs">${group.descs}</td>
                         <td class="p-3 text-center font-bold text-yellow-400 text-base">
-                            ${item.qty.toLocaleString('id-ID')} Pcs
+                            ${group.packages.toLocaleString('id-ID')} Paket
                         </td>
                     </tr>
                 `;
@@ -511,7 +583,7 @@
                 titleSpan.innerText = "📱 Data No HP Member";
                 document.getElementById('panelMember').classList.remove('hidden');
             } else if (menuName === 'qty') {
-                titleSpan.innerText = "📦 Data Qty Item Terjual";
+                titleSpan.innerText = "📦 Data Qty Item Jual";
                 document.getElementById('panelQty').classList.remove('hidden');
             } else if (menuName === 'promoSummary') {
                 titleSpan.innerText = "🏷️ Rekapitulasi Penjualan Promo";
