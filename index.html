@@ -15,7 +15,7 @@
     <div class="max-w-4xl mx-auto bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-700">
         <!-- Header -->
         <div class="text-center border-b border-gray-700 pb-4 mb-6">
-            <h1 class="text-2xl font-bold text-yellow-400">📊 Dashboard Ngintip</h1>
+            <h1 class="text-2xl font-bold text-yellow-400">📊 Dashboard Ngintip Data v2</h1>
             <p class="text-gray-400 text-xs mt-1">by TakimichiMod</p>
         </div>
 
@@ -172,16 +172,16 @@
                 </div>
             </div>
 
-            <!-- TAMPILAN MENU 4: SUMMARY & DETAIL PROMO (PSM, PWP, SERBA GRATIS) -->
+            <!-- TAMPILAN MENU 4: SUMMARY & DETAIL PROMO -->
             <div id="panelPromoSummary" class="hidden space-y-6">
-                <!-- GRID KARTU SUMMARY PROMO (3 KARTU SEJAJAR) -->
+                <!-- GRID KARTU SUMMARY PROMO -->
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     
                     <!-- 1. KARTU PROMO PSM -->
                     <div onclick="tampilkanDetailPromo('psm')" id="cardPsm" class="p-5 bg-gradient-to-br from-amber-900/40 to-yellow-800/30 hover:from-amber-800/60 hover:to-yellow-700/50 border border-yellow-600/50 rounded-xl cursor-pointer transition-all shadow-md group">
                         <div class="flex justify-between items-center mb-2">
                             <span class="text-xs font-bold text-yellow-400 tracking-wider">🏷️ PROMO PSM</span>
-                            <span class="text-[10px] bg-yellow-500/20 text-yellow-300 px-2 py-0.5 rounded-full border border-yellow-500/30 group-hover:bg-yellow-500 group-hover:text-black transition-colors">Klik Detail ➔</span>
+                            <span class="text-[10px] bg-yellow-500/20 text-yellow-300 px-2 py-0.5 rounded-full border border-yellow-500/30 group-hover:bg-yellow-500 group-hover:text-black transition-colors">Buka/Tutup ➔</span>
                         </div>
                         <p id="totalPsmCount" class="text-2xl font-extrabold text-white">0 Paket</p>
                         <p class="text-[11px] text-gray-400 mt-1">Paket promo PSM per nomor struk</p>
@@ -191,7 +191,7 @@
                     <div onclick="tampilkanDetailPromo('pwp')" id="cardPwp" class="p-5 bg-gradient-to-br from-blue-900/40 to-indigo-800/30 hover:from-blue-800/60 hover:to-indigo-700/50 border border-blue-600/50 rounded-xl cursor-pointer transition-all shadow-md group">
                         <div class="flex justify-between items-center mb-2">
                             <span class="text-xs font-bold text-cyan-400 tracking-wider">💳 PROMO PWP</span>
-                            <span class="text-[10px] bg-cyan-500/20 text-cyan-300 px-2 py-0.5 rounded-full border border-cyan-500/30 group-hover:bg-cyan-500 group-hover:text-black transition-colors">Klik Detail ➔</span>
+                            <span class="text-[10px] bg-cyan-500/20 text-cyan-300 px-2 py-0.5 rounded-full border border-cyan-500/30 group-hover:bg-cyan-500 group-hover:text-black transition-colors">Buka/Tutup ➔</span>
                         </div>
                         <p id="totalPwpCount" class="text-2xl font-extrabold text-white">0 Paket</p>
                         <p class="text-[11px] text-gray-400 mt-1">Paket promo PWP (logpromo terisi)</p>
@@ -201,7 +201,7 @@
                     <div onclick="tampilkanDetailPromo('serbagratis')" id="cardSerbaGratis" class="p-5 bg-gradient-to-br from-emerald-900/40 to-teal-800/30 hover:from-emerald-800/60 hover:to-teal-700/50 border border-emerald-600/50 rounded-xl cursor-pointer transition-all shadow-md group">
                         <div class="flex justify-between items-center mb-2">
                             <span class="text-xs font-bold text-emerald-400 tracking-wider">🎁 SERBA GRATIS</span>
-                            <span class="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-500/30 group-hover:bg-emerald-500 group-hover:text-black transition-colors">Klik Detail ➔</span>
+                            <span class="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-500/30 group-hover:bg-emerald-500 group-hover:text-black transition-colors">Buka/Tutup ➔</span>
                         </div>
                         <p id="totalSerbaGratisCount" class="text-2xl font-extrabold text-white">0 Paket</p>
                         <p class="text-[11px] text-gray-400 mt-1">Paket promo Serba Gratis (logpromo terisi)</p>
@@ -224,7 +224,7 @@
                         <table class="w-full text-left text-sm text-gray-300">
                             <thead class="bg-gray-700 text-yellow-400 uppercase text-xs">
                                 <tr>
-                                    <th class="p-3">Grup Promo (GROUP_ID)</th>
+                                    <th class="p-3">Kode PLU</th>
                                     <th class="p-3">Deskripsi Produk</th>
                                     <th class="p-3 text-center">Total Paket Terjual</th>
                                 </tr>
@@ -245,8 +245,8 @@
     <script>
         const config = { locateFile: filename => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/${filename}` };
         let activeDb = null;
+        let currentActivePromo = null; // Menelusuri kartu promo mana yang sedang dibuka
 
-        // Penampung Data Promo Terproses (PSM, PWP, SERBA GRATIS)
         let promoStore = {
             psm: { totalPackages: 0, groupResults: [] },
             pwp: { totalPackages: 0, groupResults: [] },
@@ -405,7 +405,7 @@
             }
         }
 
-        // FUNGSI UTAMA KALKULASI GENERIK PROMO (MENDUKUNG PSM, PWP, SERBA GRATIS)
+        // FUNGSI UTAMA KALKULASI GENERIK PROMO (PSM, PWP, SERBA GRATIS)
         async function hitungGenericPromo(promoType) {
             if(!activeDb) return;
 
@@ -438,7 +438,6 @@
                     return;
                 }
 
-                // Parsing CSV
                 const groupsMap = {};
 
                 for (let i = 1; i < lines.length; i++) {
@@ -478,16 +477,12 @@
                     groupsMap[groupId].descs.push(cleanNama);
                 }
 
-                // Evaluasi Database SQL Per Struk (bill_no)
                 for (const groupId in groupsMap) {
                     const group = groupsMap[groupId];
                     const isCrossPromo = group.getPlus.length > 0;
                     const allPlus = [...group.buyPlus, ...group.getPlus];
                     const pluPlaceholders = allPlus.map(() => '?').join(',');
 
-                    // Perbedaan Syarat SQL:
-                    // PWP & SERBA GRATIS: logpromo HARUS TERISI
-                    // PSM: logpromo tidak wajib, tapi referensi HARUS KOSONG
                     const promoCondition = isCheckLogpromo 
                         ? `AND (logpromo IS NOT NULL AND TRIM(CAST(logpromo AS TEXT)) != '') AND (referensi IS NULL OR TRIM(CAST(referensi AS TEXT)) = '')`
                         : `AND (referensi IS NULL OR TRIM(CAST(referensi AS TEXT)) = '')`;
@@ -515,7 +510,7 @@
                         const row = stmt.getAsObject();
                         const billNo = row.bill_no;
                         const qty = row.item_qty || 0;
-                        let cleanPlu = raw_plu = row.raw_plu;
+                        let cleanPlu = row.raw_plu;
 
                         if (cleanPlu.endsWith('2')) cleanPlu = cleanPlu.slice(0, -1);
 
@@ -549,6 +544,7 @@
                         promoStore[promoType].totalPackages += totalGroupPackages;
                         promoStore[promoType].groupResults.push({
                             groupId: group.groupId,
+                            plusStr: allPlus.join(' / '), // Menyimpan string daftar PLU
                             descs: group.descs.join(' / '),
                             packages: totalGroupPackages
                         });
@@ -563,13 +559,21 @@
             }
         }
 
-        // FUNGSI TAMPILKAN RINCIAN DETAIL PROMO SAAT KARTU DIKLIK
+        // FUNGSI TAMPILKAN/TUTUP RINCIAN DETAIL PROMO (TOGGLE TOGETHER)
         function tampilkanDetailPromo(promoType) {
             const detailSection = document.getElementById('detailPromoSection');
             const titleEl = document.getElementById('detailPromoTitle');
             const tbody = document.getElementById('tablePromoDetailBody');
             const badgeEl = document.getElementById('detailItemCountBadge');
 
+            // FITUR TOGGLE: Jika kartu yang sama diklik saat sedang terbuka, tutup area detailnya
+            if (currentActivePromo === promoType && !detailSection.classList.contains('hidden')) {
+                detailSection.classList.add('hidden');
+                currentActivePromo = null;
+                return;
+            }
+
+            currentActivePromo = promoType;
             const data = promoStore[promoType];
 
             detailSection.classList.remove('hidden');
@@ -592,7 +596,7 @@
             data.groupResults.forEach(group => {
                 tbody.innerHTML += `
                     <tr class="hover:bg-gray-700">
-                        <td class="p-3 font-mono text-cyan-400 font-semibold">${group.groupId}</td>
+                        <td class="p-3 font-mono text-cyan-400 font-semibold">${group.plusStr}</td>
                         <td class="p-3 text-gray-200 font-medium text-xs">${group.descs}</td>
                         <td class="p-3 text-center font-bold text-yellow-400 text-base">
                             ${group.packages.toLocaleString('id-ID')} Paket
@@ -636,10 +640,12 @@
             document.getElementById('outputArea').classList.add('hidden');
             document.getElementById('menuSection').classList.remove('hidden');
             document.getElementById('detailPromoSection').classList.add('hidden');
+            currentActivePromo = null;
         }
 
         function resetApp() {
             activeDb = null;
+            currentActivePromo = null;
             document.getElementById('zipInput').value = "";
             document.getElementById('memberSearchInput').value = "";
             document.getElementById('pluSearchInput').value = "";
