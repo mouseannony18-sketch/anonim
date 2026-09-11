@@ -15,7 +15,7 @@
     <div class="max-w-4xl mx-auto bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-700">
         <!-- Header -->
         <div class="text-center border-b border-gray-700 pb-4 mb-6">
-            <h1 class="text-2xl font-bold text-yellow-400">📊 Dashboard Ngintip v2</h1>
+            <h1 class="text-2xl font-bold text-yellow-400">📊 Dashboard Ngintip Data v2</h1>
             <p class="text-gray-400 text-xs mt-1">by TakimichiMod</p>
         </div>
 
@@ -172,10 +172,10 @@
                 </div>
             </div>
 
-            <!-- TAMPILAN MENU 4: SUMMARY & DETAIL PROMO -->
+            <!-- TAMPILAN MENU 4: SUMMARY & DETAIL PROMO (PSM, PWP, SERBA GRATIS, SEJAGAT) -->
             <div id="panelPromoSummary" class="hidden space-y-6">
-                <!-- GRID KARTU SUMMARY PROMO -->
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <!-- GRID KARTU SUMMARY PROMO (4 KARTU) -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                     
                     <!-- 1. KARTU PROMO PSM -->
                     <div onclick="tampilkanDetailPromo('psm')" id="cardPsm" class="p-5 bg-gradient-to-br from-amber-900/40 to-yellow-800/30 hover:from-amber-800/60 hover:to-yellow-700/50 border border-yellow-600/50 rounded-xl cursor-pointer transition-all shadow-md group">
@@ -205,6 +205,16 @@
                         </div>
                         <p id="totalSerbaGratisCount" class="text-2xl font-extrabold text-white">0 Paket</p>
                         <p class="text-[11px] text-gray-400 mt-1">Paket promo Serba Gratis per nomor struk</p>
+                    </div>
+
+                    <!-- 4. KARTU PROMO SEJAGAT -->
+                    <div onclick="tampilkanDetailPromo('sejagat')" id="cardSejagat" class="p-5 bg-gradient-to-br from-rose-900/40 to-pink-800/30 hover:from-rose-800/60 hover:to-pink-700/50 border border-rose-600/50 rounded-xl cursor-pointer transition-all shadow-md group">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-xs font-bold text-rose-400 tracking-wider">🌍 PROMO SEJAGAT</span>
+                            <span class="text-[10px] bg-rose-500/20 text-rose-300 px-2 py-0.5 rounded-full border border-rose-500/30 group-hover:bg-rose-500 group-hover:text-black transition-colors">Buka/Tutup ➔</span>
+                        </div>
+                        <p id="totalSejagatCount" class="text-2xl font-extrabold text-white">0 Paket</p>
+                        <p class="text-[11px] text-gray-400 mt-1">Paket promo Sejagat per nomor struk</p>
                     </div>
 
                 </div>
@@ -247,10 +257,12 @@
         let activeDb = null;
         let currentActivePromo = null;
 
+        // Penampung Data Promo Terproses (PSM, PWP, SERBA GRATIS, SEJAGAT)
         let promoStore = {
             psm: { totalPackages: 0, groupResults: [] },
             pwp: { totalPackages: 0, groupResults: [] },
-            serbagratis: { totalPackages: 0, groupResults: [] }
+            serbagratis: { totalPackages: 0, groupResults: [] },
+            sejagat: { totalPackages: 0, groupResults: [] }
         };
 
         document.getElementById('zipInput').addEventListener('change', async (e) => {
@@ -405,7 +417,7 @@
             }
         }
 
-        // FUNGSI UTAMA KALKULASI PROMO (MENGABAIKAN LOGPROMO UNTUK SEMUA JENIS PROMO)
+        // FUNGSI UTAMA KALKULASI GENERIK PROMO (PSM, PWP, SERBA GRATIS, SEJAGAT)
         async function hitungGenericPromo(promoType) {
             if(!activeDb) return;
 
@@ -414,6 +426,7 @@
             let cardElId = 'totalPsmCount';
             if (promoType === 'pwp') cardElId = 'totalPwpCount';
             if (promoType === 'serbagratis') cardElId = 'totalSerbaGratisCount';
+            if (promoType === 'sejagat') cardElId = 'totalSejagatCount';
 
             const cardEl = document.getElementById(cardElId);
             cardEl.innerText = "⏳ Memproses...";
@@ -482,7 +495,6 @@
                     const allPlus = [...group.buyPlus, ...group.getPlus];
                     const pluPlaceholders = allPlus.map(() => '?').join(',');
 
-                    // KUERI DIBERSIHKAN: Cukup cek referensi KOSONG (penjualan toko murni)
                     const sqlQuery = `
                         SELECT 
                             bill_no,
@@ -577,6 +589,7 @@
             let promoLabel = "PSM";
             if (promoType === 'pwp') promoLabel = "PWP";
             if (promoType === 'serbagratis') promoLabel = "Serba Gratis";
+            if (promoType === 'sejagat') promoLabel = "Sejagat";
 
             titleEl.innerText = `📋 Rincian Paket Promo ${promoLabel} yang Terjual`;
 
@@ -628,6 +641,7 @@
                 hitungGenericPromo('psm');
                 hitungGenericPromo('pwp');
                 hitungGenericPromo('serbagratis');
+                hitungGenericPromo('sejagat');
             }
         }
 
