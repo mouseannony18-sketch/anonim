@@ -15,7 +15,7 @@
     <div class="max-w-4xl mx-auto bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-700">
         <!-- Header -->
         <div class="text-center border-b border-gray-700 pb-4 mb-6">
-            <h1 class="text-2xl font-bold text-yellow-400">📊 Dashboard Ngintipv2</h1>
+            <h1 class="text-2xl font-bold text-yellow-400">📊 Dashboard Ngintip Data v2</h1>
             <p class="text-gray-400 text-xs mt-1">by TakimichiMod</p>
         </div>
 
@@ -172,26 +172,38 @@
                 </div>
             </div>
 
-            <!-- TAMPILAN MENU 4: SUMMARY & DETAIL PROMO PSM -->
+            <!-- TAMPILAN MENU 4: SUMMARY & DETAIL PROMO (PSM & PWP) -->
             <div id="panelPromoSummary" class="hidden space-y-6">
                 <!-- GRID KARTU SUMMARY PROMO -->
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <!-- KARTU PROMO PSM -->
-                    <div onclick="tampilkanDetailPsm()" class="p-5 bg-gradient-to-br from-amber-900/40 to-yellow-800/30 hover:from-amber-800/60 hover:to-yellow-700/50 border border-yellow-600/50 rounded-xl cursor-pointer transition-all shadow-md group">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    
+                    <!-- 1. KARTU PROMO PSM -->
+                    <div onclick="tampilkanDetailPromo('psm')" id="cardPsm" class="p-5 bg-gradient-to-br from-amber-900/40 to-yellow-800/30 hover:from-amber-800/60 hover:to-yellow-700/50 border border-yellow-600/50 rounded-xl cursor-pointer transition-all shadow-md group">
                         <div class="flex justify-between items-center mb-2">
                             <span class="text-xs font-bold text-yellow-400 tracking-wider">🏷️ PROMO PSM</span>
                             <span class="text-[10px] bg-yellow-500/20 text-yellow-300 px-2 py-0.5 rounded-full border border-yellow-500/30 group-hover:bg-yellow-500 group-hover:text-black transition-colors">Klik Detail ➔</span>
                         </div>
                         <p id="totalPsmCount" class="text-2xl font-extrabold text-white">0 Paket</p>
-                        <p class="text-[11px] text-gray-400 mt-1">Total akumulasi paket promo per nomor struk (bill_no)</p>
+                        <p class="text-[11px] text-gray-400 mt-1">Total paket promo PSM per nomor struk</p>
                     </div>
+
+                    <!-- 2. KARTU PROMO PWP -->
+                    <div onclick="tampilkanDetailPromo('pwp')" id="cardPwp" class="p-5 bg-gradient-to-br from-blue-900/40 to-indigo-800/30 hover:from-blue-800/60 hover:to-indigo-700/50 border border-blue-600/50 rounded-xl cursor-pointer transition-all shadow-md group">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-xs font-bold text-cyan-400 tracking-wider">💳 PROMO PWP</span>
+                            <span class="text-[10px] bg-cyan-500/20 text-cyan-300 px-2 py-0.5 rounded-full border border-cyan-500/30 group-hover:bg-cyan-500 group-hover:text-black transition-colors">Klik Detail ➔</span>
+                        </div>
+                        <p id="totalPwpCount" class="text-2xl font-extrabold text-white">0 Paket</p>
+                        <p class="text-[11px] text-gray-400 mt-1">Total paket promo PWP (logpromo terisi)</p>
+                    </div>
+
                 </div>
 
-                <!-- AREA DETAIL TABEL PSM -->
-                <div id="detailPsmSection" class="hidden bg-gray-800 rounded-xl border border-gray-700 p-4 space-y-3">
+                <!-- AREA DETAIL TABEL DINAMIS (TAMPIL SESUAI KARTU DIKLIK) -->
+                <div id="detailPromoSection" class="hidden bg-gray-800 rounded-xl border border-gray-700 p-4 space-y-3">
                     <div class="flex justify-between items-center border-b border-gray-700 pb-2">
-                        <h3 class="text-sm font-bold text-yellow-400 flex items-center gap-1.5">
-                            📋 Rincian Paket Promo PSM yang Terjual
+                        <h3 id="detailPromoTitle" class="text-sm font-bold text-yellow-400 flex items-center gap-1.5">
+                            📋 Rincian Paket Promo
                         </h3>
                         <span id="detailItemCountBadge" class="text-xs px-2 py-0.5 bg-yellow-900/50 border border-yellow-600/40 rounded text-yellow-300 font-mono">
                             0 Kelompok Promo
@@ -207,9 +219,9 @@
                                     <th class="p-3 text-center">Total Paket Terjual</th>
                                 </tr>
                             </thead>
-                            <tbody id="tablePsmDetailBody" class="divide-y divide-gray-700">
+                            <tbody id="tablePromoDetailBody" class="divide-y divide-gray-700">
                                 <tr>
-                                    <td colspan="3" class="p-4 text-center text-gray-400 text-xs">Klik Kartu PSM di atas untuk melihat data.</td>
+                                    <td colspan="3" class="p-4 text-center text-gray-400 text-xs">Klik salah satu kartu promo di atas untuk melihat rincian.</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -224,9 +236,10 @@
         const config = { locateFile: filename => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/${filename}` };
         let activeDb = null;
 
-        let psmDataStore = {
-            totalPromoPackages: 0,
-            groupResults: []
+        // Penampung Data Promo Terproses
+        let promoStore = {
+            psm: { totalPackages: 0, groupResults: [] },
+            pwp: { totalPackages: 0, groupResults: [] }
         };
 
         document.getElementById('zipInput').addEventListener('change', async (e) => {
@@ -381,20 +394,22 @@
             }
         }
 
-        // LOGIKA ADVANCED: HANDLING PROMO B2G1 & PROMO SILANG (BUY X GET Y) PER STRUK (bill_no)
-        async function hitungPromoPSM() {
+        // FUNGSI UTAMA KALKULASI GENERIK PROMO (MENDUKUNG PSM DAN PWP)
+        async function hitungGenericPromo(promoType) {
             if(!activeDb) return;
 
-            const cardCountEl = document.getElementById('totalPsmCount');
-            cardCountEl.innerText = "⏳ Memproses...";
+            const isPwp = promoType === 'pwp';
+            const fileName = isPwp ? './pwp.csv' : './psm.csv';
+            const cardEl = document.getElementById(isPwp ? 'totalPwpCount' : 'totalPsmCount');
 
-            psmDataStore.totalPromoPackages = 0;
-            psmDataStore.groupResults = [];
+            cardEl.innerText = "⏳ Memproses...";
+            promoStore[promoType].totalPackages = 0;
+            promoStore[promoType].groupResults = [];
 
             try {
-                const response = await fetch('./psm.csv');
+                const response = await fetch(fileName);
                 if(!response.ok) {
-                    cardCountEl.innerText = "CSV Hilang";
+                    cardEl.innerText = "CSV Hilang";
                     return;
                 }
 
@@ -403,11 +418,11 @@
                 const lines = cleanCsvText.split('\n');
 
                 if(lines.length <= 1) {
-                    cardCountEl.innerText = "0 Paket";
+                    cardEl.innerText = "0 Paket";
                     return;
                 }
 
-                // 1. Parsing Struktur CSV Baru (GROUP_ID, ROLE, TARGET_QTY)
+                // Parsing CSV
                 const groupsMap = {};
 
                 for (let i = 1; i < lines.length; i++) {
@@ -420,7 +435,7 @@
                     const cleanPlu = cols[0] ? cols[0].trim() : '';
                     const cleanNama = cols[1] ? cols[1].trim() : '-';
                     const groupId = cols[2] ? cols[2].trim() : cleanPlu;
-                    const role = cols[3] ? cols[3].trim().toUpperCase() : 'BUY'; // 'BUY' atau 'GET'
+                    const role = cols[3] ? cols[3].trim().toUpperCase() : 'BUY';
                     const targetQty = cols[4] ? parseInt(cols[4].trim()) || 1 : 1;
 
                     if(!cleanPlu) continue;
@@ -447,15 +462,20 @@
                     groupsMap[groupId].descs.push(cleanNama);
                 }
 
-                // 2. Kueri SQL Evaluasi Per Group ID & Bill No
+                // Evaluasi Database SQL Per Struk (bill_no)
                 for (const groupId in groupsMap) {
                     const group = groupsMap[groupId];
-                    const isCrossPromo = group.getPlus.length > 0; // Cek apakah ada barang bonus terpisah
-
+                    const isCrossPromo = group.getPlus.length > 0;
                     const allPlus = [...group.buyPlus, ...group.getPlus];
                     const pluPlaceholders = allPlus.map(() => '?').join(',');
 
-                    // Ambil detail transaksi per bill_no untuk item-item yang masuk dalam grup ini
+                    // Perbedaan Syarat SQL PWP vs PSM:
+                    // PWP: logpromo HARUS TERISI
+                    // PSM: logpromo tidak wajib, tapi referensi HARUS KOSONG
+                    const promoCondition = isPwp 
+                        ? `AND (logpromo IS NOT NULL AND TRIM(CAST(logpromo AS TEXT)) != '') AND (referensi IS NULL OR TRIM(CAST(referensi AS TEXT)) = '')`
+                        : `AND (referensi IS NULL OR TRIM(CAST(referensi AS TEXT)) = '')`;
+
                     const sqlQuery = `
                         SELECT 
                             bill_no,
@@ -466,14 +486,13 @@
                             CAST(plu AS TEXT) IN (${pluPlaceholders})
                             OR CAST(CASE WHEN CAST(plu AS TEXT) LIKE '%2' THEN SUBSTR(CAST(plu AS TEXT), 1, LENGTH(CAST(plu AS TEXT)) - 1) ELSE CAST(plu AS TEXT) END AS TEXT) IN (${pluPlaceholders})
                         )
-                        AND (referensi IS NULL OR TRIM(CAST(referensi AS TEXT)) = '')
+                        ${promoCondition}
                         GROUP BY bill_no, raw_plu;
                     `;
 
                     const stmt = activeDb.prepare(sqlQuery);
                     stmt.bind([...allPlus, ...allPlus]);
 
-                    // Map menampung qty per bill_no: { 'STRUK123': { buyQty: 2, getQty: 1 } }
                     const billMap = {};
 
                     while (stmt.step()) {
@@ -484,9 +503,7 @@
 
                         if (cleanPlu.endsWith('2')) cleanPlu = cleanPlu.slice(0, -1);
 
-                        if (!billMap[billNo]) {
-                            billMap[billNo] = { buyQty: 0, getQty: 0 };
-                        }
+                        if (!billMap[billNo]) billMap[billNo] = { buyQty: 0, getQty: 0 };
 
                         if (group.buyPlus.includes(cleanPlu)) {
                             billMap[billNo].buyQty += qty;
@@ -496,21 +513,16 @@
                     }
                     stmt.free();
 
-                    // Hitung Paket Promo Per Struk
                     let totalGroupPackages = 0;
 
                     for (const billNo in billMap) {
                         const data = billMap[billNo];
 
                         if (isCrossPromo) {
-                            // Promo Beli A Gratis B (Beli 2 Tango + Gratis 1 Taro)
                             const buyPacks = Math.floor(data.buyQty / group.buyTarget);
                             const getPacks = Math.floor(data.getQty / group.getTarget);
-                            // Ambil kuota terendah yang terpenuhi di struk
-                            const validPacks = Math.min(buyPacks, getPacks);
-                            totalGroupPackages += validPacks;
+                            totalGroupPackages += Math.min(buyPacks, getPacks);
                         } else {
-                            // Promo Biasa / B2G1 Sejenis (Pakai buyTarget)
                             if (data.buyQty >= group.buyTarget) {
                                 totalGroupPackages += Math.floor(data.buyQty / group.buyTarget);
                             }
@@ -518,8 +530,8 @@
                     }
 
                     if (totalGroupPackages > 0) {
-                        psmDataStore.totalPromoPackages += totalGroupPackages;
-                        psmDataStore.groupResults.push({
+                        promoStore[promoType].totalPackages += totalGroupPackages;
+                        promoStore[promoType].groupResults.push({
                             groupId: group.groupId,
                             descs: group.descs.join(' / '),
                             packages: totalGroupPackages
@@ -527,31 +539,38 @@
                     }
                 }
 
-                cardCountEl.innerText = `${psmDataStore.totalPromoPackages.toLocaleString('id-ID')} Paket Promo`;
+                cardEl.innerText = `${promoStore[promoType].totalPackages.toLocaleString('id-ID')} Paket Promo`;
 
             } catch (err) {
-                console.error("Error saat menghitung PSM:", err);
-                cardCountEl.innerText = "Error Fetch";
+                console.error(`Error saat menghitung ${promoType}:`, err);
+                cardEl.innerText = "Error Fetch";
             }
         }
 
-        function tampilkanDetailPsm() {
-            const detailSection = document.getElementById('detailPsmSection');
-            const tbody = document.getElementById('tablePsmDetailBody');
+        // FUNGSI TAMPILKAN RINCIAN DETAIL PROMO SAAT KARTU DIKLIK
+        function tampilkanDetailPromo(promoType) {
+            const detailSection = document.getElementById('detailPromoSection');
+            const titleEl = document.getElementById('detailPromoTitle');
+            const tbody = document.getElementById('tablePromoDetailBody');
             const badgeEl = document.getElementById('detailItemCountBadge');
+
+            const isPwp = promoType === 'pwp';
+            const data = promoStore[promoType];
 
             detailSection.classList.remove('hidden');
             tbody.innerHTML = "";
 
-            if (psmDataStore.groupResults.length === 0) {
+            titleEl.innerText = isPwp ? "📋 Rincian Paket Promo PWP yang Terjual" : "📋 Rincian Paket Promo PSM yang Terjual";
+
+            if (data.groupResults.length === 0) {
                 badgeEl.innerText = "0 Kelompok Promo";
-                tbody.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-gray-400 text-xs">Tidak ada paket promo PSM yang memenuhi syarat per nomor struk (bill_no) di database ini.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-gray-400 text-xs">Tidak ada paket promo ${promoType.toUpperCase()} yang memenuhi syarat per nomor struk (bill_no) di database ini.</td></tr>`;
                 return;
             }
 
-            badgeEl.innerText = `${psmDataStore.groupResults.length} Kelompok Promo Terjual`;
+            badgeEl.innerText = `${data.groupResults.length} Kelompok Promo Terjual`;
 
-            psmDataStore.groupResults.forEach(group => {
+            data.groupResults.forEach(group => {
                 tbody.innerHTML += `
                     <tr class="hover:bg-gray-700">
                         <td class="p-3 font-mono text-cyan-400 font-semibold">${group.groupId}</td>
@@ -583,19 +602,20 @@
                 titleSpan.innerText = "📱 Data No HP Member";
                 document.getElementById('panelMember').classList.remove('hidden');
             } else if (menuName === 'qty') {
-                titleSpan.innerText = "📦 Data Qty Item Jual";
+                titleSpan.innerText = "📦 Data Qty Item Terjual";
                 document.getElementById('panelQty').classList.remove('hidden');
             } else if (menuName === 'promoSummary') {
                 titleSpan.innerText = "🏷️ Rekapitulasi Penjualan Promo";
                 document.getElementById('panelPromoSummary').classList.remove('hidden');
-                hitungPromoPSM();
+                hitungGenericPromo('psm'); // Hitung Kartu PSM
+                hitungGenericPromo('pwp'); // Hitung Kartu PWP
             }
         }
 
         function backToMenu() {
             document.getElementById('outputArea').classList.add('hidden');
             document.getElementById('menuSection').classList.remove('hidden');
-            document.getElementById('detailPsmSection').classList.add('hidden');
+            document.getElementById('detailPromoSection').classList.add('hidden');
         }
 
         function resetApp() {
@@ -606,7 +626,7 @@
             document.getElementById('menuSection').classList.add('hidden');
             document.getElementById('outputArea').classList.add('hidden');
             document.getElementById('uploadSection').classList.remove('hidden');
-            document.getElementById('detailPsmSection').classList.add('hidden');
+            document.getElementById('detailPromoSection').classList.add('hidden');
         }
     </script>
 </body>
