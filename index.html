@@ -15,7 +15,7 @@
     <div class="max-w-4xl mx-auto bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-700">
         <!-- Header -->
         <div class="text-center border-b border-gray-700 pb-4 mb-6">
-            <h1 class="text-2xl font-bold text-yellow-400">📊 Dashboard Ngintip Data v2 tes</h1>
+            <h1 class="text-2xl font-bold text-yellow-400">📊 Dashboard Ngintip Data tes v2</h1>
             <p class="text-gray-400 text-xs mt-1">by TakimichiMod</p>
         </div>
 
@@ -47,7 +47,7 @@
                     📦 3. Cek Qty Item Jual
                 </button>
                 <button onclick="switchMenu('promoSummary')" class="p-4 bg-gradient-to-br from-amber-700 to-yellow-600 hover:from-amber-600 hover:to-yellow-500 rounded-xl font-bold text-center transition-transform hover:scale-105 shadow-md">
-                    🏷️ 4. Rekap Penjualan Item Promo
+                    🏷️ 4. Tes Pembacaan PLU CSV
                 </button>
             </div>
             <div class="text-center pt-4">
@@ -172,29 +172,26 @@
                 </div>
             </div>
 
-            <!-- TAMPILAN MENU 4: MENU REKAP PROMO (SUMMARY & DETAIL) -->
+            <!-- TAMPILAN MENU 4: TES PEMBACAAN PLU PSM.CSV -->
             <div id="panelPromoSummary" class="hidden space-y-6">
-                <!-- GRID KARTU SUMMARY PROMO -->
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <!-- KARTU PROMO PSM -->
-                    <div onclick="tampilkanDetailPsm()" class="p-5 bg-gradient-to-br from-amber-900/40 to-yellow-800/30 hover:from-amber-800/60 hover:to-yellow-700/50 border border-yellow-600/50 rounded-xl cursor-pointer transition-all shadow-md group">
-                        <div class="flex justify-between items-center mb-2">
-                            <span class="text-xs font-bold text-yellow-400 tracking-wider">🏷️ PROMO PSM</span>
-                            <span class="text-[10px] bg-yellow-500/20 text-yellow-300 px-2 py-0.5 rounded-full border border-yellow-500/30 group-hover:bg-yellow-500 group-hover:text-black transition-colors">Klik Detail ➔</span>
-                        </div>
-                        <p id="totalPsmCount" class="text-2xl font-extrabold text-white">0 Pcs</p>
-                        <p class="text-[11px] text-gray-400 mt-1">Penjualan toko murni (logpromo - referensi)</p>
+                <!-- KARTU TOTAL PLU DITEMUKAN -->
+                <div class="p-5 bg-gradient-to-br from-amber-900/40 to-yellow-800/30 border border-yellow-600/50 rounded-xl shadow-md">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-xs font-bold text-yellow-400 tracking-wider">🧪 HASIL TES MURNI PLU CSV (tx_trans)</span>
+                        <span id="csvStatusBadge" class="text-[10px] bg-yellow-500/20 text-yellow-300 px-2 py-0.5 rounded-full border border-yellow-500/30">Memeriksa CSV...</span>
                     </div>
+                    <p id="totalPsmCount" class="text-2xl font-extrabold text-white">0 Baris Ditemukan</p>
+                    <p class="text-[11px] text-gray-400 mt-1">Total kemunculan PLU dari file psm.csv di dalam tabel tx_trans (tanpa filter syarat)</p>
                 </div>
 
-                <!-- AREA DETAIL TABEL PSM (TAMPIL SETELAH KARTU DIKLIK) -->
-                <div id="detailPsmSection" class="hidden bg-gray-800 rounded-xl border border-gray-700 p-4 space-y-3">
+                <!-- TABEL RINCIAN PLU CSV VS DATABASE -->
+                <div class="bg-gray-800 rounded-xl border border-gray-700 p-4 space-y-3">
                     <div class="flex justify-between items-center border-b border-gray-700 pb-2">
                         <h3 class="text-sm font-bold text-yellow-400 flex items-center gap-1.5">
-                            📋 Rincian Item Promo PSM yang Terjual
+                            📋 Rincian Pencocokan PLU CSV ke Tabel tx_trans
                         </h3>
                         <span id="detailItemCountBadge" class="text-xs px-2 py-0.5 bg-yellow-900/50 border border-yellow-600/40 rounded text-yellow-300 font-mono">
-                            0 Item
+                            0 Jenis PLU
                         </span>
                     </div>
 
@@ -202,14 +199,14 @@
                         <table class="w-full text-left text-sm text-gray-300">
                             <thead class="bg-gray-700 text-yellow-400 uppercase text-xs">
                                 <tr>
-                                    <th class="p-3">PLU</th>
-                                    <th class="p-3">Deskripsi Barang (DESC)</th>
-                                    <th class="p-3 text-center">Penjualan Toko Murni</th>
+                                    <th class="p-3">PLU CSV</th>
+                                    <th class="p-3">Deskripsi (DESC)</th>
+                                    <th class="p-3 text-center">Jumlah Ditemukan di tx_trans</th>
                                 </tr>
                             </thead>
                             <tbody id="tablePsmDetailBody" class="divide-y divide-gray-700">
                                 <tr>
-                                    <td colspan="3" class="p-4 text-center text-gray-400 text-xs">Klik Kartu PSM di atas untuk melihat data.</td>
+                                    <td colspan="3" class="p-4 text-center text-gray-400 text-xs">Memuat data...</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -223,12 +220,6 @@
     <script>
         const config = { locateFile: filename => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/${filename}` };
         let activeDb = null;
-
-        // Penyimpanan Data PSM Terproses
-        let psmDataStore = {
-            totalQty: 0,
-            validItems: []
-        };
 
         document.getElementById('zipInput').addEventListener('change', async (e) => {
             const file = e.target.files[0];
@@ -307,37 +298,26 @@
             }
         }
 
-        // PROSES MENU 2: SEARCHBOX REALTIME MEMBER
+        // PROSES MENU 2: MEMBER
         function cariMember() {
             if(!activeDb) return;
-
             const keyword = document.getElementById('memberSearchInput').value.trim();
             const tbody = document.getElementById('tableMemberBody');
-
             if(keyword === "") {
                 tbody.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-gray-400 text-xs">Ketik kata kunci di atas untuk mencari data.</td></tr>`;
                 return;
             }
-
             const query = `
-                SELECT DISTINCT
-                    u.member_name,
-                    u.no_member,
-                    s.phone
+                SELECT DISTINCT u.member_name, u.no_member, s.phone
                 FROM tx_usi u
                 JOIN tx_tsale s ON u.no_member = s.cust_id
-                WHERE u.member_name LIKE '%' || ? || '%' 
-                   OR s.phone LIKE '%' || ? || '%'
-                LIMIT 50;
+                WHERE u.member_name LIKE '%' || ? || '%' OR s.phone LIKE '%' || ? || '%' LIMIT 50;
             `;
-
             try {
                 const stmt = activeDb.prepare(query);
                 stmt.bind([keyword, keyword]);
-
                 tbody.innerHTML = "";
                 let hasData = false;
-
                 while(stmt.step()) {
                     hasData = true;
                     const row = stmt.getAsObject();
@@ -346,56 +326,36 @@
                             <td class="p-3 font-semibold text-yellow-300">${row.member_name || '-'}</td>
                             <td class="p-3 font-mono text-cyan-400">${row.no_member || '-'}</td>
                             <td class="p-3 font-mono text-emerald-400">${row.phone || '-'}</td>
-                        </tr>
-                    `;
+                        </tr>`;
                 }
                 stmt.free();
-
-                if(!hasData) {
-                    tbody.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-red-400 text-xs">Data tidak ditemukan.</td></tr>`;
-                }
-
+                if(!hasData) tbody.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-red-400 text-xs">Data tidak ditemukan.</td></tr>`;
             } catch (err) {
                 console.error(err);
-                tbody.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-red-400 text-xs">Gagal memproses pencarian.</td></tr>`;
             }
         }
 
-        // PROSES MENU 3: SEARCHBOX REALTIME QTY ITEM JUAL
+        // PROSES MENU 3: QTY ITEM JUAL
         function cariQtyItem() {
             if(!activeDb) return;
-
             const inputPlu = document.getElementById('pluSearchInput').value.trim();
             const tbody = document.getElementById('tableQtyBody');
-
             if(inputPlu === "") {
                 tbody.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-gray-400 text-xs">Ketik Kode PLU di atas untuk melihat total penjualan.</td></tr>`;
                 return;
             }
-
             const query = `
-                SELECT 
-                    plu AS db_raw_plu, 
-                    SUM(qty_all) AS total_qty 
+                SELECT plu AS db_raw_plu, SUM(qty_all) AS total_qty 
                 FROM log_sales_cashier 
-                WHERE 
-                    CAST(plu AS TEXT) = ? 
-                    OR CAST(
-                        CASE 
-                            WHEN CAST(plu AS TEXT) LIKE '%2' THEN SUBSTR(CAST(plu AS TEXT), 1, LENGTH(CAST(plu AS TEXT)) - 1)
-                            ELSE CAST(plu AS TEXT)
-                        END AS TEXT
-                    ) = ?
+                WHERE CAST(plu AS TEXT) = ? 
+                   OR CAST(CASE WHEN CAST(plu AS TEXT) LIKE '%2' THEN SUBSTR(CAST(plu AS TEXT), 1, LENGTH(CAST(plu AS TEXT)) - 1) ELSE CAST(plu AS TEXT) END AS TEXT) = ?
                 GROUP BY db_raw_plu;
             `;
-
             try {
                 const stmt = activeDb.prepare(query);
                 stmt.bind([inputPlu, inputPlu]);
-
                 tbody.innerHTML = "";
                 let hasData = false;
-
                 while(stmt.step()) {
                     hasData = true;
                     const row = stmt.getAsObject();
@@ -404,36 +364,34 @@
                             <td class="p-3 font-mono text-gray-400">${inputPlu}</td>
                             <td class="p-3 font-mono text-cyan-400 font-semibold">${row.db_raw_plu}</td>
                             <td class="p-3 font-bold text-emerald-400 text-base">${Number(row.total_qty).toLocaleString('id-ID')} Pcs</td>
-                        </tr>
-                    `;
+                        </tr>`;
                 }
                 stmt.free();
-
-                if(!hasData) {
-                    tbody.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-red-400 text-xs">PLU "${inputPlu}" tidak ditemukan di tabel log penjualan.</td></tr>`;
-                }
-
+                if(!hasData) tbody.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-red-400 text-xs">PLU "${inputPlu}" tidak ditemukan.</td></tr>`;
             } catch (err) {
                 console.error(err);
-                tbody.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-red-400 text-xs">Gagal memproses kueri PLU.</td></tr>`;
             }
         }
 
-        // PROSES UTAMA PROMO PSM (LOGIKA PENJUALAN TOKO MURNI: LOGPROMO - REFERENSI PER PLU CSV)
-        async function hitungPromoPSM() {
+        // FUNGSI UJI COBA MURNI: PEMBACAAN CSV & PENCOCOKAN PLU KE tx_trans
+        async function tesPembacaanCsv() {
             if(!activeDb) return;
 
             const cardCountEl = document.getElementById('totalPsmCount');
-            cardCountEl.innerText = "⏳ Memproses...";
+            const statusBadge = document.getElementById('csvStatusBadge');
+            const badgeEl = document.getElementById('detailItemCountBadge');
+            const tbody = document.getElementById('tablePsmDetailBody');
 
-            psmDataStore.totalQty = 0;
-            psmDataStore.validItems = [];
+            cardCountEl.innerText = "⏳ Membaca psm.csv...";
+            tbody.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-yellow-400 text-xs animate-pulse">Memproses kueri database...</td></tr>`;
 
             try {
                 // 1. Fetch File psm.csv
                 const response = await fetch('./psm.csv');
                 if(!response.ok) {
-                    cardCountEl.innerText = "CSV Hilang";
+                    statusBadge.innerText = "CSV Tidak Ditemukan";
+                    cardCountEl.innerText = "Error File CSV";
+                    tbody.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-red-400 text-xs">File psm.csv tidak ditemukan di server.</td></tr>`;
                     return;
                 }
 
@@ -442,32 +400,29 @@
                 const lines = cleanCsvText.split('\n');
 
                 if(lines.length <= 1) {
-                    cardCountEl.innerText = "0 Pcs";
+                    statusBadge.innerText = "CSV Kosong";
+                    cardCountEl.innerText = "0 Baris";
+                    tbody.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-red-400 text-xs">File psm.csv tidak memiliki baris data.</td></tr>`;
                     return;
                 }
 
-                // 2. Kueri SQL Subquery Terpisah:
-                // total_logpromo = Semua baris PLU ini yang logpromo-nya terisi
-                // total_referensi = Semua baris PLU ini yang referensi-nya terisi
+                statusBadge.innerText = `CSV Terbaca: ${lines.length - 1} PLU`;
+
+                // 2. Kueri SQL Murni Mencocokkan PLU (Tanpa Filter Logpromo / Referensi)
+                // Mendukung perbandingan angka murni maupun substring
                 const sqlQuery = `
-                    SELECT 
-                        (
-                            SELECT COUNT(*) 
-                            FROM tx_trans 
-                            WHERE TRIM(CAST(plu AS TEXT)) = TRIM(?)
-                              AND (logpromo IS NOT NULL AND TRIM(CAST(logpromo AS TEXT)) != '')
-                        ) AS total_logpromo,
-                        (
-                            SELECT COUNT(*) 
-                            FROM tx_trans 
-                            WHERE TRIM(CAST(plu AS TEXT)) = TRIM(?)
-                              AND (referensi IS NOT NULL AND TRIM(CAST(referensi AS TEXT)) != '')
-                        ) AS total_referensi;
+                    SELECT COUNT(*) AS total_ditemukan 
+                    FROM tx_trans 
+                    WHERE TRIM(CAST(plu AS TEXT)) = TRIM(?)
+                       OR TRIM(CAST(plu AS TEXT)) = TRIM(?) || '2';
                 `;
 
                 const stmt = activeDb.prepare(sqlQuery);
 
-                // 3. Iterasi PLU khusus dari File CSV
+                let totalAkumulasiBaris = 0;
+                let listHasil = [];
+
+                // 3. Iterasi PLU dari CSV
                 for (let i = 1; i < lines.length; i++) {
                     const rowStr = lines[i].trim();
                     if (!rowStr) continue;
@@ -480,72 +435,46 @@
 
                     if(!cleanPlu) continue;
 
-                    // Bind parameter PLU dua kali untuk 2 subquery
                     stmt.bind([cleanPlu, cleanPlu]);
-                    
-                    let totalLogpromo = 0;
-                    let totalReferensi = 0;
+                    let countDitemukan = 0;
 
                     if (stmt.step()) {
-                        const res = stmt.getAsObject();
-                        totalLogpromo = res.total_logpromo || 0;
-                        totalReferensi = res.total_referensi || 0;
+                        countDitemukan = stmt.getAsObject().total_ditemukan || 0;
                     }
                     stmt.reset();
 
-                    // Hitung Penjualan Toko Murni
-                    const penjualanToko = totalLogpromo - totalReferensi;
-
-                    // Jika hasilnya > 0, catat sebagai item terjual
-                    if (penjualanToko > 0) {
-                        psmDataStore.totalQty += penjualanToko;
-                        psmDataStore.validItems.push({
-                            plu: cleanPlu,
-                            nama: cleanNama,
-                            qty: penjualanToko
-                        });
-                    }
+                    totalAkumulasiBaris += countDitemukan;
+                    listHasil.push({
+                        plu: cleanPlu,
+                        nama: cleanNama,
+                        count: countDitemukan
+                    });
                 }
 
                 stmt.free();
 
-                // 4. Update Angka ke Kartu Summary PSM
-                cardCountEl.innerText = `${psmDataStore.totalQty.toLocaleString('id-ID')} Pcs`;
+                // 4. Tampilkan Hasil ke Kartu & Tabel
+                cardCountEl.innerText = `${totalAkumulasiBaris.toLocaleString('id-ID')} Baris Transaksi`;
+                badgeEl.innerText = `${listHasil.length} PLU Terbaca dari CSV`;
+
+                tbody.innerHTML = "";
+                listHasil.forEach(item => {
+                    tbody.innerHTML += `
+                        <tr class="hover:bg-gray-700">
+                            <td class="p-3 font-mono text-cyan-400 font-semibold">${item.plu}</td>
+                            <td class="p-3 text-gray-200 font-medium">${item.nama}</td>
+                            <td class="p-3 text-center font-bold ${item.count > 0 ? 'text-green-400 text-base' : 'text-red-400'}">
+                                ${item.count > 0 ? `${item.count} Kali Ditemukan` : '0 (Tidak Ada di DB)'}
+                            </td>
+                        </tr>
+                    `;
+                });
 
             } catch (err) {
-                console.error("Error saat menghitung PSM:", err);
-                cardCountEl.innerText = "Error Fetch";
+                console.error("Error pada tesPembacaanCsv:", err);
+                cardCountEl.innerText = "Error Eksekusi";
+                tbody.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-red-400 text-xs">Error: ${err.message}</td></tr>`;
             }
-        }
-
-        // FUNGSI SAAT KARTU PSM DIKLIK -> TAMPILKAN TABEL DETAIL
-        function tampilkanDetailPsm() {
-            const detailSection = document.getElementById('detailPsmSection');
-            const tbody = document.getElementById('tablePsmDetailBody');
-            const badgeEl = document.getElementById('detailItemCountBadge');
-
-            detailSection.classList.remove('hidden');
-            tbody.innerHTML = "";
-
-            if (psmDataStore.validItems.length === 0) {
-                badgeEl.innerText = "0 Item";
-                tbody.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-gray-400 text-xs">Tidak ada item promo PSM dari psm.csv yang memiliki penjualan toko murni di database ini.</td></tr>`;
-                return;
-            }
-
-            badgeEl.innerText = `${psmDataStore.validItems.length} Jenis Item Terjual`;
-
-            psmDataStore.validItems.forEach(item => {
-                tbody.innerHTML += `
-                    <tr class="hover:bg-gray-700">
-                        <td class="p-3 font-mono text-cyan-400 font-semibold">${item.plu}</td>
-                        <td class="p-3 text-gray-200 font-medium">${item.nama}</td>
-                        <td class="p-3 text-center font-bold text-yellow-400 text-base">
-                            ${item.qty.toLocaleString('id-ID')} Pcs
-                        </td>
-                    </tr>
-                `;
-            });
         }
 
         // NAVIGASI PANEL MENU
@@ -567,19 +496,18 @@
                 titleSpan.innerText = "📱 Data No HP Member";
                 document.getElementById('panelMember').classList.remove('hidden');
             } else if (menuName === 'qty') {
-                titleSpan.innerText = "📦 Data Qty Item Terjual";
+                titleSpan.innerText = "📦 Data Qty Item Jual";
                 document.getElementById('panelQty').classList.remove('hidden');
             } else if (menuName === 'promoSummary') {
-                titleSpan.innerText = "🏷️ Rekapitulasi Penjualan Promo";
+                titleSpan.innerText = "🏷️ Tes Pembacaan PLU CSV";
                 document.getElementById('panelPromoSummary').classList.remove('hidden');
-                hitungPromoPSM();
+                tesPembacaanCsv();
             }
         }
 
         function backToMenu() {
             document.getElementById('outputArea').classList.add('hidden');
             document.getElementById('menuSection').classList.remove('hidden');
-            document.getElementById('detailPsmSection').classList.add('hidden');
         }
 
         function resetApp() {
@@ -590,7 +518,6 @@
             document.getElementById('menuSection').classList.add('hidden');
             document.getElementById('outputArea').classList.add('hidden');
             document.getElementById('uploadSection').classList.remove('hidden');
-            document.getElementById('detailPsmSection').classList.add('hidden');
         }
     </script>
 </body>
