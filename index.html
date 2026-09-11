@@ -15,7 +15,7 @@
     <div class="max-w-4xl mx-auto bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-700">
         <!-- Header -->
         <div class="text-center border-b border-gray-700 pb-4 mb-6">
-            <h1 class="text-2xl font-bold text-yellow-400">📊 Dashboard Ngintip Data Ready v2</h1>
+            <h1 class="text-2xl font-bold text-yellow-400">📊 Dashboard Program Bantu v2</h1>
             <p class="text-gray-400 text-xs mt-1">by TakimichiMod</p>
         </div>
 
@@ -183,7 +183,7 @@
                             <span class="text-[10px] bg-yellow-500/20 text-yellow-300 px-2 py-0.5 rounded-full border border-yellow-500/30 group-hover:bg-yellow-500 group-hover:text-black transition-colors">Klik Detail ➔</span>
                         </div>
                         <p id="totalPsmCount" class="text-2xl font-extrabold text-white">0 Pcs</p>
-                        <p class="text-[11px] text-gray-400 mt-1">Penjualan toko murni (logpromo - referensi)</p>
+                        <p class="text-[11px] text-gray-400 mt-1">Total Qty penjualan toko murni (referensi kosong)</p>
                     </div>
                 </div>
 
@@ -204,7 +204,7 @@
                                 <tr>
                                     <th class="p-3">PLU</th>
                                     <th class="p-3">Deskripsi Barang (DESC)</th>
-                                    <th class="p-3 text-center">Penjualan Toko Murni</th>
+                                    <th class="p-3 text-center">Total Qty Terjual</th>
                                 </tr>
                             </thead>
                             <tbody id="tablePsmDetailBody" class="divide-y divide-gray-700">
@@ -381,7 +381,7 @@
             }
         }
 
-        // PROSES UTAMA PROMO PSM (MENDUKUNG PLU WITH/WITHOUT DIGIT '2' + HAPUS AKUMULASI DENGAN REFERENSI)
+        // PROSES UTAMA PROMO PSM (HANYA CEK REFERENSI KOSONG & SUM KOLOM QTY)
         async function hitungPromoPSM() {
             if(!activeDb) return;
 
@@ -407,27 +407,18 @@
                     return;
                 }
 
-                // Kueri SQL dengan pemotongan digit '2' di akhir PLU DB jika ada
+                // Kueri SQL Baru:
+                // 1. Cocokkan PLU dari CSV (termasuk pemotongan angka '2' di akhir jika ada)
+                // 2. Cek kolom referensi HARUS KOSONG (NULL atau '')
+                // 3. Jumlahkan total kuantitas dari kolom qty
                 const sqlQuery = `
-                    SELECT 
-                        (
-                            SELECT COUNT(*) 
-                            FROM tx_trans 
-                            WHERE (
-                                CAST(plu AS TEXT) = ? 
-                                OR CAST(CASE WHEN CAST(plu AS TEXT) LIKE '%2' THEN SUBSTR(CAST(plu AS TEXT), 1, LENGTH(CAST(plu AS TEXT)) - 1) ELSE CAST(plu AS TEXT) END AS TEXT) = ?
-                            )
-                            AND (logpromo IS NOT NULL AND TRIM(CAST(logpromo AS TEXT)) != '')
-                        ) AS total_logpromo,
-                        (
-                            SELECT COUNT(*) 
-                            FROM tx_trans 
-                            WHERE (
-                                CAST(plu AS TEXT) = ? 
-                                OR CAST(CASE WHEN CAST(plu AS TEXT) LIKE '%2' THEN SUBSTR(CAST(plu AS TEXT), 1, LENGTH(CAST(plu AS TEXT)) - 1) ELSE CAST(plu AS TEXT) END AS TEXT) = ?
-                            )
-                            AND (referensi IS NOT NULL AND TRIM(CAST(referensi AS TEXT)) != '')
-                        ) AS total_referensi;
+                    SELECT IFNULL(SUM(CAST(qty AS NUMERIC)), 0) AS total_qty 
+                    FROM tx_trans 
+                    WHERE (
+                        CAST(plu AS TEXT) = ? 
+                        OR CAST(CASE WHEN CAST(plu AS TEXT) LIKE '%2' THEN SUBSTR(CAST(plu AS TEXT), 1, LENGTH(CAST(plu AS TEXT)) - 1) ELSE CAST(plu AS TEXT) END AS TEXT) = ?
+                    )
+                    AND (referensi IS NULL OR TRIM(CAST(referensi AS TEXT)) = '');
                 `;
 
                 const stmt = activeDb.prepare(sqlQuery);
@@ -444,27 +435,20 @@
 
                     if(!cleanPlu) continue;
 
-                    // Bind parameter PLU 4x untuk 2 pasang pencocokan PLU
-                    stmt.bind([cleanPlu, cleanPlu, cleanPlu, cleanPlu]);
-                    
-                    let totalLogpromo = 0;
-                    let totalReferensi = 0;
+                    stmt.bind([cleanPlu, cleanPlu]);
+                    let itemQty = 0;
 
                     if (stmt.step()) {
-                        const res = stmt.getAsObject();
-                        totalLogpromo = res.total_logpromo || 0;
-                        totalReferensi = res.total_referensi || 0;
+                        itemQty = stmt.getAsObject().total_qty || 0;
                     }
                     stmt.reset();
 
-                    const penjualanToko = totalLogpromo - totalReferensi;
-
-                    if (penjualanToko > 0) {
-                        psmDataStore.totalQty += penjualanToko;
+                    if (itemQty > 0) {
+                        psmDataStore.totalQty += itemQty;
                         psmDataStore.validItems.push({
                             plu: cleanPlu,
                             nama: cleanNama,
-                            qty: penjualanToko
+                            qty: itemQty
                         });
                     }
                 }
@@ -489,7 +473,7 @@
 
             if (psmDataStore.validItems.length === 0) {
                 badgeEl.innerText = "0 Item";
-                tbody.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-gray-400 text-xs">Tidak ada item promo PSM dari psm.csv yang memiliki penjualan toko murni di database ini.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-gray-400 text-xs">Tidak ada item promo PSM dari psm.csv yang terdeteksi di database ini.</td></tr>`;
                 return;
             }
 
