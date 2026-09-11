@@ -15,7 +15,7 @@
     <div class="max-w-4xl mx-auto bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-700">
         <!-- Header -->
         <div class="text-center border-b border-gray-700 pb-4 mb-6">
-            <h1 class="text-2xl font-bold text-yellow-400">📊 Dashboard Ngintip Data v2</h1>
+            <h1 class="text-2xl font-bold text-yellow-400">📊 Dashboard Ngintip v2</h1>
             <p class="text-gray-400 text-xs mt-1">by TakimichiMod</p>
         </div>
 
@@ -194,7 +194,7 @@
                             <span class="text-[10px] bg-cyan-500/20 text-cyan-300 px-2 py-0.5 rounded-full border border-cyan-500/30 group-hover:bg-cyan-500 group-hover:text-black transition-colors">Buka/Tutup ➔</span>
                         </div>
                         <p id="totalPwpCount" class="text-2xl font-extrabold text-white">0 Paket</p>
-                        <p class="text-[11px] text-gray-400 mt-1">Paket promo PWP (logpromo terisi)</p>
+                        <p class="text-[11px] text-gray-400 mt-1">Paket promo PWP per nomor struk</p>
                     </div>
 
                     <!-- 3. KARTU PROMO SERBA GRATIS -->
@@ -204,7 +204,7 @@
                             <span class="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-500/30 group-hover:bg-emerald-500 group-hover:text-black transition-colors">Buka/Tutup ➔</span>
                         </div>
                         <p id="totalSerbaGratisCount" class="text-2xl font-extrabold text-white">0 Paket</p>
-                        <p class="text-[11px] text-gray-400 mt-1">Paket promo Serba Gratis (logpromo terisi)</p>
+                        <p class="text-[11px] text-gray-400 mt-1">Paket promo Serba Gratis per nomor struk</p>
                     </div>
 
                 </div>
@@ -245,7 +245,7 @@
     <script>
         const config = { locateFile: filename => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/${filename}` };
         let activeDb = null;
-        let currentActivePromo = null; // Menelusuri kartu promo mana yang sedang dibuka
+        let currentActivePromo = null;
 
         let promoStore = {
             psm: { totalPackages: 0, groupResults: [] },
@@ -405,11 +405,10 @@
             }
         }
 
-        // FUNGSI UTAMA KALKULASI GENERIK PROMO (PSM, PWP, SERBA GRATIS)
+        // FUNGSI UTAMA KALKULASI PROMO (MENGABAIKAN LOGPROMO UNTUK SEMUA JENIS PROMO)
         async function hitungGenericPromo(promoType) {
             if(!activeDb) return;
 
-            const isCheckLogpromo = (promoType === 'pwp' || promoType === 'serbagratis');
             const fileName = `./${promoType}.csv`;
             
             let cardElId = 'totalPsmCount';
@@ -483,10 +482,7 @@
                     const allPlus = [...group.buyPlus, ...group.getPlus];
                     const pluPlaceholders = allPlus.map(() => '?').join(',');
 
-                    const promoCondition = isCheckLogpromo 
-                        ? `AND (logpromo IS NOT NULL AND TRIM(CAST(logpromo AS TEXT)) != '') AND (referensi IS NULL OR TRIM(CAST(referensi AS TEXT)) = '')`
-                        : `AND (referensi IS NULL OR TRIM(CAST(referensi AS TEXT)) = '')`;
-
+                    // KUERI DIBERSIHKAN: Cukup cek referensi KOSONG (penjualan toko murni)
                     const sqlQuery = `
                         SELECT 
                             bill_no,
@@ -497,7 +493,7 @@
                             CAST(plu AS TEXT) IN (${pluPlaceholders})
                             OR CAST(CASE WHEN CAST(plu AS TEXT) LIKE '%2' THEN SUBSTR(CAST(plu AS TEXT), 1, LENGTH(CAST(plu AS TEXT)) - 1) ELSE CAST(plu AS TEXT) END AS TEXT) IN (${pluPlaceholders})
                         )
-                        ${promoCondition}
+                        AND (referensi IS NULL OR TRIM(CAST(referensi AS TEXT)) = '')
                         GROUP BY bill_no, raw_plu;
                     `;
 
@@ -544,7 +540,7 @@
                         promoStore[promoType].totalPackages += totalGroupPackages;
                         promoStore[promoType].groupResults.push({
                             groupId: group.groupId,
-                            plusStr: allPlus.join(' / '), // Menyimpan string daftar PLU
+                            plusStr: allPlus.join(' / '),
                             descs: group.descs.join(' / '),
                             packages: totalGroupPackages
                         });
@@ -559,14 +555,13 @@
             }
         }
 
-        // FUNGSI TAMPILKAN/TUTUP RINCIAN DETAIL PROMO (TOGGLE TOGETHER)
+        // FUNGSI TAMPILKAN/TUTUP RINCIAN DETAIL PROMO
         function tampilkanDetailPromo(promoType) {
             const detailSection = document.getElementById('detailPromoSection');
             const titleEl = document.getElementById('detailPromoTitle');
             const tbody = document.getElementById('tablePromoDetailBody');
             const badgeEl = document.getElementById('detailItemCountBadge');
 
-            // FITUR TOGGLE: Jika kartu yang sama diklik saat sedang terbuka, tutup area detailnya
             if (currentActivePromo === promoType && !detailSection.classList.contains('hidden')) {
                 detailSection.classList.add('hidden');
                 currentActivePromo = null;
@@ -630,9 +625,9 @@
             } else if (menuName === 'promoSummary') {
                 titleSpan.innerText = "🏷️ Rekapitulasi Penjualan Promo";
                 document.getElementById('panelPromoSummary').classList.remove('hidden');
-                hitungGenericPromo('psm');          // Hitung Kartu PSM
-                hitungGenericPromo('pwp');          // Hitung Kartu PWP
-                hitungGenericPromo('serbagratis');  // Hitung Kartu Serba Gratis
+                hitungGenericPromo('psm');
+                hitungGenericPromo('pwp');
+                hitungGenericPromo('serbagratis');
             }
         }
 
