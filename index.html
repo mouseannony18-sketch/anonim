@@ -37,8 +37,8 @@
         <div id="menuSection" class="hidden space-y-4 mb-6">
             <h2 class="text-center text-lg font-semibold text-cyan-400 mb-4">Silakan Pilih Menu Analisis Data:</h2>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <button onclick="switchMenu('setoran')" class="p-4 bg-gradient-to-br from-green-700 to-emerald-600 hover:from-green-600 hover:to-emerald-500 rounded-xl font-bold text-center transition-transform hover:scale-105 shadow-md">
-                    💰 1. Cek Setoran Kasir
+                <button onclick="switchMenu('setoran')" class="p-4 bg-gradient-to-br from-green-700 to-emerald-600 hover:from-green-600 hover:to-emerald-500 rounded-xl font-bold text-center transition-transform hover:scale-105 shadow-md flex items-center justify-center gap-2">
+                    🔒 1. Cek Setoran Kasir <span class="text-[10px] bg-black/30 px-2 py-0.5 rounded text-green-300 font-normal">Proteksi Pass</span>
                 </button>
                 <button onclick="switchMenu('member')" class="p-4 bg-gradient-to-br from-blue-700 to-cyan-600 hover:from-blue-600 hover:to-cyan-500 rounded-xl font-bold text-center transition-transform hover:scale-105 shadow-md">
                     📱 2. Cek No HP Member
@@ -174,7 +174,7 @@
 
             <!-- TAMPILAN MENU 4: SUMMARY & DETAIL PROMO -->
             <div id="panelPromoSummary" class="hidden space-y-6">
-                <!-- GRID KARTU SUMMARY PROMO (6 KARTU) -->
+                <!-- GRID KARTU SUMMARY PROMO -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
                     
                     <!-- 1. KARTU PROMO PSM -->
@@ -272,12 +272,31 @@
         </div>
     </div>
 
+    <!-- MODAL VERIFIKASI PASSWORD SETORAN -->
+    <div id="passwordModal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+        <div class="bg-gray-800 border border-gray-700 rounded-xl p-6 max-w-xs w-full shadow-2xl space-y-4 text-center">
+            <div class="text-2xl">🔒</div>
+            <h3 class="font-bold text-white text-md">Akses Terkunci</h3>
+            <p class="text-xs text-gray-400">Masukkan Password untuk membuka Cek Setoran Kasir:</p>
+            
+            <input type="password" id="passInput" maxlength="2" placeholder="-- " 
+                   onkeydown="if(event.key==='Enter') verifikasiPassword()"
+                   class="w-full p-2.5 bg-gray-900 border border-gray-600 rounded-lg text-center font-mono text-lg font-bold text-yellow-400 focus:outline-none focus:border-yellow-400">
+            
+            <p id="passErrorMsg" class="text-xs text-red-400 hidden font-medium">⚠️ Password Salah!</p>
+
+            <div class="flex gap-2">
+                <button onclick="tutupPasswordModal()" class="w-1/2 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-xs font-semibold text-gray-300">Batal</button>
+                <button onclick="verifikasiPassword()" class="w-1/2 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-xs font-bold text-white">Buka</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         const config = { locateFile: filename => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/${filename}` };
         let activeDb = null;
         let currentActivePromo = null;
 
-        // Penampung Data Promo Terproses
         let promoStore = {
             psm: { totalPackages: 0, groupResults: [] },
             pwp: { totalPackages: 0, groupResults: [] },
@@ -326,6 +345,54 @@
                 statusDiv.classList.add('hidden');
             }
         });
+
+        // FUNGSI MODAL & VERIFIKASI PASSWORD MENIT PERANGKAT
+        function mintaPasswordSetoran() {
+            const modal = document.getElementById('passwordModal');
+            const input = document.getElementById('passInput');
+            const err = document.getElementById('passErrorMsg');
+            
+            input.value = "";
+            err.classList.add('hidden');
+            modal.classList.remove('hidden');
+            setTimeout(() => input.focus(), 100);
+        }
+
+        function tutupPasswordModal() {
+            document.getElementById('passwordModal').classList.add('hidden');
+        }
+
+        function verifikasiPassword() {
+            const inputVal = document.getElementById('passInput').value.trim();
+            
+            // Mengambil Menit Saat Ini (2 Digit, misal "05" atau "42")
+            const currentMinute = new Date().getMinutes();
+            const correctPass1 = String(currentMinute).padStart(2, '0'); // Contoh: "05"
+            const correctPass2 = String(currentMinute);                // Contoh: "5"
+
+            if (inputVal === correctPass1 || inputVal === correctPass2) {
+                tutupPasswordModal();
+                bukaPanelSetoran();
+            } else {
+                const err = document.getElementById('passErrorMsg');
+                err.classList.remove('hidden');
+                document.getElementById('passInput').value = "";
+                document.getElementById('passInput').focus();
+            }
+        }
+
+        function bukaPanelSetoran() {
+            document.getElementById('menuSection').classList.add('hidden');
+            document.getElementById('outputArea').classList.remove('hidden');
+
+            document.getElementById('panelSetoran').classList.add('hidden');
+            document.getElementById('panelMember').classList.add('hidden');
+            document.getElementById('panelQty').classList.add('hidden');
+            document.getElementById('panelPromoSummary').classList.add('hidden');
+
+            document.getElementById('currentMenuTitle').innerText = "💰 Analisis Setoran Kasir";
+            document.getElementById('panelSetoran').classList.remove('hidden');
+        }
 
         // PROSES MENU 1: SETORAN KASIR
         function prosesMenuSetoran() {
@@ -439,7 +506,7 @@
             }
         }
 
-        // FUNGSI UTAMA KALKULASI GENERIK PROMO (DENGAN HANDLER SYARAT HARGA SUEGER & CEBAN)
+        // FUNGSI UTAMA KALKULASI GENERIK PROMO
         async function hitungGenericPromo(promoType) {
             if(!activeDb) return;
 
@@ -513,7 +580,6 @@
                     groupsMap[groupId].descs.push(cleanNama);
                 }
 
-                // Kondisi khusus untuk PROMO SUEGER (2900) & CEBAN (10000):
                 let priceCondition = "";
                 if (promoType === 'sueger') {
                     priceCondition = `AND (CAST(price AS NUMERIC) - CAST(IFNULL(special_disc, 0) AS NUMERIC)) = 2900`;
@@ -649,8 +715,13 @@
             });
         }
 
-        // NAVIGASI PANEL MENU
+        // NAVIGASI PANEL MENU (MODIFIKASI UNTUK SETORAN)
         function switchMenu(menuName) {
+            if (menuName === 'setoran') {
+                mintaPasswordSetoran();
+                return;
+            }
+
             document.getElementById('menuSection').classList.add('hidden');
             document.getElementById('outputArea').classList.remove('hidden');
 
@@ -661,10 +732,7 @@
 
             const titleSpan = document.getElementById('currentMenuTitle');
 
-            if (menuName === 'setoran') {
-                titleSpan.innerText = "💰 Analisis Setoran Kasir";
-                document.getElementById('panelSetoran').classList.remove('hidden');
-            } else if (menuName === 'member') {
+            if (menuName === 'member') {
                 titleSpan.innerText = "📱 Data No HP Member";
                 document.getElementById('panelMember').classList.remove('hidden');
             } else if (menuName === 'qty') {
