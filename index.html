@@ -364,11 +364,9 @@
 
         function verifikasiPassword() {
             const inputVal = document.getElementById('passInput').value.trim();
-            
-            // Mengambil Menit Saat Ini (2 Digit, misal "05" atau "42")
             const currentMinute = new Date().getMinutes();
-            const correctPass1 = String(currentMinute).padStart(2, '0'); // Contoh: "05"
-            const correctPass2 = String(currentMinute);                // Contoh: "5"
+            const correctPass1 = String(currentMinute).padStart(2, '0');
+            const correctPass2 = String(currentMinute);
 
             if (inputVal === correctPass1 || inputVal === correctPass2) {
                 tutupPasswordModal();
@@ -506,7 +504,7 @@
             }
         }
 
-        // FUNGSI UTAMA KALKULASI GENERIK PROMO
+        // FUNGSI UTAMA KALKULASI GENERIK PROMO (LOGIKA BARU: MEMERIKSA KOLOM SPECIAL_DISC > 0)
         async function hitungGenericPromo(promoType) {
             if(!activeDb) return;
 
@@ -580,11 +578,10 @@
                     groupsMap[groupId].descs.push(cleanNama);
                 }
 
+                // LOGIKA BARU SUEGER & CEBAN: MENGECEK TERDAPAT DISKON PADA KOLOM SPECIAL_DISC (> 0)
                 let priceCondition = "";
-                if (promoType === 'sueger') {
-                    priceCondition = `AND (CAST(price AS NUMERIC) - CAST(IFNULL(special_disc, 0) AS NUMERIC)) = 2900`;
-                } else if (promoType === 'ceban') {
-                    priceCondition = `AND (CAST(price AS NUMERIC) - CAST(IFNULL(special_disc, 0) AS NUMERIC)) = 10000`;
+                if (promoType === 'sueger' || promoType === 'ceban') {
+                    priceCondition = `AND (CAST(IFNULL(special_disc, 0) AS NUMERIC) > 0)`;
                 }
 
                 for (const groupId in groupsMap) {
@@ -658,7 +655,7 @@
                     }
                 }
 
-                cardEl.innerText = `${promoStore[promoType].totalPackages.toLocaleString('id-ID')} Paket Promo`;
+                cardEl.innerText = `${promoStore[promoType].totalPackages.toLocaleString('id-ID')} Pcs`;
 
             } catch (err) {
                 console.error(`Error saat menghitung ${promoType}:`, err);
@@ -689,8 +686,8 @@
             if (promoType === 'pwp') promoLabel = "PWP";
             if (promoType === 'serbagratis') promoLabel = "Serba Gratis";
             if (promoType === 'sejagat') promoLabel = "Sejagat";
-            if (promoType === 'sueger') promoLabel = "Sueger (Rp 2.900)";
-            if (promoType === 'ceban') promoLabel = "Ceban (Rp 10.000)";
+            if (promoType === 'sueger') promoLabel = "Sueger";
+            if (promoType === 'ceban') promoLabel = "Ceban";
 
             titleEl.innerText = `📋 Rincian Paket Promo ${promoLabel} yang Terjual`;
 
@@ -708,14 +705,14 @@
                         <td class="p-3 font-mono text-cyan-400 font-semibold">${group.plusStr}</td>
                         <td class="p-3 text-gray-200 font-medium text-xs">${group.descs}</td>
                         <td class="p-3 text-center font-bold text-yellow-400 text-base">
-                            ${group.packages.toLocaleString('id-ID')} Paket
+                            ${group.packages.toLocaleString('id-ID')} Pcs
                         </td>
                     </tr>
                 `;
             });
         }
 
-        // NAVIGASI PANEL MENU (MODIFIKASI UNTUK SETORAN)
+        // NAVIGASI PANEL MENU
         function switchMenu(menuName) {
             if (menuName === 'setoran') {
                 mintaPasswordSetoran();
