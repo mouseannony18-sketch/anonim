@@ -1,0 +1,951 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Program Bantu - Filter Tanggal & Kasir</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <!-- Library Ekstrak ZIP & SQLite WASM -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/sql-wasm.js"></script>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen p-4 md:p-8">
+
+    <div class="max-w-5xl mx-auto bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-700">
+        <!-- Header -->
+        <div class="text-center border-b border-gray-700 pb-4 mb-6">
+            <h1 class="text-2xl font-bold text-yellow-400">📊 Dashboard Program Bantu v2.2</h1>
+            <p class="text-gray-400 text-xs mt-1">Gunakan dengan bijak, Segala resiko ditanggung sendiri.</p>
+        </div>
+
+        <!-- SECTION 1: UPLOAD FILE (Halaman Awal) -->
+        <div id="uploadSection" class="mb-6">
+            <div class="border-2 border-dashed border-gray-600 rounded-lg p-8 text-center bg-gray-700/50 hover:border-cyan-400 transition-colors">
+                <label class="block text-sm font-medium text-cyan-400 mb-4 cursor-pointer">
+                    📂 Pilih atau Taruh File ZIP Database di Sini:
+                </label>
+                <input type="file" id="zipInput" accept=".zip" 
+                       class="w-full max-w-xs mx-auto text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-cyan-600 file:text-white hover:file:bg-cyan-700 cursor-pointer bg-gray-800 rounded-lg p-1 border border-gray-600">
+            </div>
+        </div>
+
+        <!-- Status Loading -->
+        <div id="status" class="text-yellow-400 text-sm mb-4 hidden animate-pulse text-center font-semibold">⏳ Sedang memuat modul database...</div>
+
+        <!-- SECTION FILTER TANGGAL & KASIR (Dinamis) -->
+        <div id="filterSection" class="hidden bg-gray-700/60 p-4 rounded-xl border border-gray-600 mb-6 space-y-3">
+            <h3 class="text-xs font-bold uppercase text-cyan-400 tracking-wider flex items-center gap-2">
+                🗓️ Filter Periode Data & Kasir:
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs text-gray-300 mb-1">Tanggal Transaksi (date_tx):</label>
+                    <select id="filterDateSelect" onchange="onFilterChange()" class="w-full p-2.5 bg-gray-800 border border-gray-600 rounded-lg text-sm text-yellow-400 font-semibold focus:outline-none focus:border-cyan-400">
+                        <option value="ALL">Semua Tanggal Transaksi</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-300 mb-1">NIK Kasir (user_id):</label>
+                    <select id="filterUserSelect" onchange="onFilterChange()" class="w-full p-2.5 bg-gray-800 border border-gray-600 rounded-lg text-sm text-cyan-400 font-semibold focus:outline-none focus:border-cyan-400">
+                        <option value="ALL">Semua Kasir</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECTION 2: PILIHAN MENU UTAMA -->
+        <div id="menuSection" class="hidden space-y-4 mb-6">
+            <h2 class="text-center text-lg font-semibold text-cyan-400 mb-4">Silakan Pilih Menu yang Anda Inginkan:</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <button onclick="switchMenu('setoran')" class="p-4 bg-gradient-to-br from-green-700 to-emerald-600 hover:from-green-600 hover:to-emerald-500 rounded-xl font-bold text-center transition-transform hover:scale-105 shadow-md flex items-center justify-center gap-2">
+                    🔒 1. Cek Setoran Kasir <span class="text-[10px] bg-black/30 px-2 py-0.5 rounded text-green-300 font-normal">Proteksi Pass</span>
+                </button>
+                <button onclick="switchMenu('member')" class="p-4 bg-gradient-to-br from-blue-700 to-cyan-600 hover:from-blue-600 hover:to-cyan-500 rounded-xl font-bold text-center transition-transform hover:scale-105 shadow-md">
+                    📱 2. Cek No HP Member
+                </button>
+                <button onclick="switchMenu('qty')" class="p-4 bg-gradient-to-br from-purple-700 to-indigo-600 hover:from-purple-600 hover:to-indigo-500 rounded-xl font-bold text-center transition-transform hover:scale-105 shadow-md">
+                    📦 3. Cek Qty Item Terjual
+                </button>
+                <button onclick="switchMenu('promoSummary')" class="p-4 bg-gradient-to-br from-amber-700 to-yellow-600 hover:from-amber-600 hover:to-yellow-500 rounded-xl font-bold text-center transition-transform hover:scale-105 shadow-md">
+                    🏷️ 4. Rekap Penjualan PPS Seger Ceban
+                </button>
+            </div>
+            <div class="text-center pt-4">
+                <button onclick="resetApp()" class="text-xs text-red-400 hover:underline">🔄 Ganti File Database (Reset)</button>
+            </div>
+        </div>
+
+        <!-- SECTION 3: AREA OUTPUT DATA -->
+        <div id="outputArea" class="hidden space-y-6">
+            
+            <!-- Tombol Kembali Global -->
+            <div class="flex justify-between items-center bg-gray-700/40 p-3 rounded-lg border border-gray-600">
+                <span id="currentMenuTitle" class="font-bold text-yellow-400"></span>
+                <button onclick="backToMenu()" class="px-4 py-1.5 bg-gray-600 hover:bg-gray-500 rounded-lg text-xs font-semibold">⬅️ Kembali ke Menu</button>
+            </div>
+
+            <!-- TAMPILAN MENU 1: SETORAN KASIR -->
+            <div id="panelSetoran" class="hidden space-y-6">
+                <div>
+                    <h3 class="text-md font-semibold text-green-400 mb-2">📋 Tabel 1: Informasi Kasir Per Tanggal</h3>
+                    <div class="overflow-x-auto rounded-lg border border-gray-700">
+                        <table class="w-full text-left text-sm text-gray-300">
+                            <thead class="bg-gray-700 text-cyan-400 uppercase text-xs">
+                                <tr>
+                                    <th class="p-3">Tanggal Tx</th>
+                                    <th class="p-3">NIK Kasir</th>
+                                    <th class="p-3">Total Struk</th>
+                                    <th class="p-3">Struk Member</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tableKasirBody" class="divide-y divide-gray-700"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div>
+                    <h3 class="text-md font-semibold text-green-400 mb-2">💰 Tabel 2: Rincian Nominal Uang Per Tanggal</h3>
+                    <div class="overflow-x-auto rounded-lg border border-gray-700">
+                        <table class="w-full text-left text-sm text-gray-300">
+                            <thead class="bg-gray-700 text-cyan-400 uppercase text-xs">
+                                <tr>
+                                    <th class="p-3">Tanggal Tx</th>
+                                    <th class="p-3">NIK</th>
+                                    <th class="p-3">Total Tunai</th>
+                                    <th class="p-3">Kartu</th>
+                                    <th class="p-3">Cash Out</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tableNominalBody" class="divide-y divide-gray-700"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div>
+                    <h3 class="text-md font-semibold text-green-400 mb-2">🎟️ Tabel 3: Rincian Delivery Order (SAPA) Per Tanggal</h3>
+                    <div class="overflow-x-auto rounded-lg border border-gray-700">
+                        <table class="w-full text-left text-sm text-gray-300">
+                            <thead class="bg-gray-700 text-cyan-400 uppercase text-xs">
+                                <tr>
+                                    <th class="p-3">Tanggal Tx</th>
+                                    <th class="p-3">NIK</th>
+                                    <th class="p-3">Struk SAPA</th>
+                                    <th class="p-3">Total COD</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tableVoucherBody" class="divide-y divide-gray-700"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAMPILAN MENU 2: NO HP MEMBER -->
+            <div id="panelMember" class="hidden space-y-4">
+                <div class="bg-gray-700/50 p-4 rounded-xl border border-gray-600">
+                    <label class="block text-xs font-semibold text-cyan-400 mb-2">🔍 Cari berdasarkan Nama Member atau Nomor Telepon:</label>
+                    <input type="text" id="memberSearchInput" oninput="cariMember()" placeholder="Ketik nama atau no HP..." 
+                           class="w-full p-2.5 bg-gray-800 border border-gray-600 rounded-lg text-sm text-white focus:outline-none focus:border-cyan-400 placeholder-gray-500">
+                </div>
+
+                <div class="overflow-x-auto rounded-lg border border-gray-700">
+                    <table class="w-full text-left text-sm text-gray-300">
+                        <thead class="bg-gray-700 text-cyan-400 uppercase text-xs">
+                            <tr>
+                                <th class="p-3">Tanggal Tx</th>
+                                <th class="p-3">Nama Member</th>
+                                <th class="p-3">ID Member / Cust ID</th>
+                                <th class="p-3">Nomor Telepon</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableMemberBody" class="divide-y divide-gray-700">
+                            <tr>
+                                <td colspan="4" class="p-4 text-center text-gray-400 text-xs">Ketik kata kunci di atas untuk mencari data.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- TAMPILAN MENU 3: QTY ITEM JUAL -->
+            <div id="panelQty" class="hidden space-y-4">
+                <div class="bg-gray-700/50 p-4 rounded-xl border border-gray-600 space-y-2">
+                    <label class="block text-xs font-semibold text-purple-400">🔍 Masukkan Kode PLU Barang:</label>
+                    <input type="text" id="pluSearchInput" oninput="cariQtyItem()" placeholder="Ketik Kode PLU barang (misal: 2622)..." 
+                           class="w-full p-2.5 bg-gray-800 border border-gray-600 rounded-lg text-sm text-white focus:outline-none focus:border-purple-400 placeholder-gray-500">
+                </div>
+
+                <div class="overflow-x-auto rounded-lg border border-gray-700">
+                    <table class="w-full text-left text-sm text-gray-300">
+                        <thead class="bg-gray-700 text-purple-400 uppercase text-xs">
+                            <tr>
+                                <th class="p-3">PLU Input</th>
+                                <th class="p-3">PLU di Database</th>
+                                <th class="p-3">Total Qty Terjual</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableQtyBody" class="divide-y divide-gray-700">
+                            <tr>
+                                <td colspan="3" class="p-4 text-center text-gray-400 text-xs">Ketik Kode PLU di atas untuk melihat total penjualan.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- TAMPILAN MENU 4: SUMMARY & DETAIL PROMO -->
+            <div id="panelPromoSummary" class="hidden space-y-6">
+                <!-- GRID KARTU SUMMARY PROMO -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                    
+                    <!-- 1. KARTU PROMO PSM -->
+                    <div onclick="tampilkanDetailPromo('psm')" id="cardPsm" class="p-3.5 bg-gradient-to-br from-amber-900/40 to-yellow-800/30 hover:from-amber-800/60 hover:to-yellow-700/50 border border-yellow-600/50 rounded-xl cursor-pointer transition-all shadow-md group">
+                        <div class="flex justify-between items-center mb-1.5">
+                            <span class="text-xs font-bold text-yellow-400 tracking-wider">🏷️ PSM</span>
+                            <span class="text-[9px] bg-yellow-500/20 text-yellow-300 px-1 py-0.5 rounded border border-yellow-500/30 group-hover:bg-yellow-500 group-hover:text-black transition-colors">Detail</span>
+                        </div>
+                        <p id="totalPsmCount" class="text-lg font-extrabold text-white">0 Paket</p>
+                        <p class="text-[10px] text-gray-400 mt-1">Promo PSM Terjual</p>
+                    </div>
+
+                    <!-- 2. KARTU PROMO PWP -->
+                    <div onclick="tampilkanDetailPromo('pwp')" id="cardPwp" class="p-3.5 bg-gradient-to-br from-blue-900/40 to-indigo-800/30 hover:from-blue-800/60 hover:to-indigo-700/50 border border-blue-600/50 rounded-xl cursor-pointer transition-all shadow-md group">
+                        <div class="flex justify-between items-center mb-1.5">
+                            <span class="text-xs font-bold text-cyan-400 tracking-wider">💳 PWP</span>
+                            <span class="text-[9px] bg-cyan-500/20 text-cyan-300 px-1 py-0.5 rounded border border-cyan-500/30 group-hover:bg-cyan-500 group-hover:text-black transition-colors">Detail</span>
+                        </div>
+                        <p id="totalPwpCount" class="text-lg font-extrabold text-white">0 Pcs</p>
+                        <p class="text-[10px] text-gray-400 mt-1">Promo PWP Terjual</p>
+                    </div>
+
+                    <!-- 3. KARTU PROMO SERBA GRATIS -->
+                    <div onclick="tampilkanDetailPromo('serbagratis')" id="cardSerbaGratis" class="p-3.5 bg-gradient-to-br from-emerald-900/40 to-teal-800/30 hover:from-emerald-800/60 hover:to-teal-700/50 border border-emerald-600/50 rounded-xl cursor-pointer transition-all shadow-md group">
+                        <div class="flex justify-between items-center mb-1.5">
+                            <span class="text-xs font-bold text-emerald-400 tracking-wider">🎁 GRATIS</span>
+                            <span class="text-[9px] bg-emerald-500/20 text-emerald-300 px-1 py-0.5 rounded border border-emerald-500/30 group-hover:bg-emerald-500 group-hover:text-black transition-colors">Detail</span>
+                        </div>
+                        <p id="totalSerbaGratisCount" class="text-lg font-extrabold text-white">0 Paket</p>
+                        <p class="text-[10px] text-gray-400 mt-1">Promo Serba Gratis Terjual</p>
+                    </div>
+
+                    <!-- 4. KARTU PROMO SEJAGAT -->
+                    <div onclick="tampilkanDetailPromo('sejagat')" id="cardSejagat" class="p-3.5 bg-gradient-to-br from-rose-900/40 to-pink-800/30 hover:from-rose-800/60 hover:to-pink-700/50 border border-rose-600/50 rounded-xl cursor-pointer transition-all shadow-md group">
+                        <div class="flex justify-between items-center mb-1.5">
+                            <span class="text-xs font-bold text-rose-400 tracking-wider">🌍 SEJAGAT</span>
+                            <span class="text-[9px] bg-rose-500/20 text-rose-300 px-1 py-0.5 rounded border border-rose-500/30 group-hover:bg-rose-500 group-hover:text-black transition-colors">Detail</span>
+                        </div>
+                        <p id="totalSejagatCount" class="text-lg font-extrabold text-white">0 Pcs</p>
+                        <p class="text-[10px] text-gray-400 mt-1">Promo Sejagat Terjual</p>
+                    </div>
+
+                    <!-- 5. KARTU PROMO SUEGER -->
+                    <div onclick="tampilkanDetailPromo('sueger')" id="cardSueger" class="p-3.5 bg-gradient-to-br from-sky-900/40 to-cyan-800/30 hover:from-sky-800/60 hover:to-cyan-700/50 border border-sky-500/50 rounded-xl cursor-pointer transition-all shadow-md group">
+                        <div class="flex justify-between items-center mb-1.5">
+                            <span class="text-xs font-bold text-sky-400 tracking-wider">🥤 SUEGER</span>
+                            <span class="text-[9px] bg-sky-500/20 text-sky-300 px-1 py-0.5 rounded border border-sky-500/30 group-hover:bg-sky-500 group-hover:text-black transition-colors">Detail</span>
+                        </div>
+                        <p id="totalSuegerCount" class="text-lg font-extrabold text-white">0 Pcs</p>
+                        <p class="text-[10px] text-gray-400 mt-1">Promo Sueger Terjual</p>
+                    </div>
+
+                    <!-- 6. KARTU PROMO CEBAN -->
+                    <div onclick="tampilkanDetailPromo('ceban')" id="cardCeban" class="p-3.5 bg-gradient-to-br from-purple-900/40 to-fuchsia-800/30 hover:from-purple-800/60 hover:to-fuchsia-700/50 border border-purple-500/50 rounded-xl cursor-pointer transition-all shadow-md group">
+                        <div class="flex justify-between items-center mb-1.5">
+                            <span class="text-xs font-bold text-purple-400 tracking-wider">💵 CEBAN</span>
+                            <span class="text-[9px] bg-purple-500/20 text-purple-300 px-1 py-0.5 rounded border border-purple-500/30 group-hover:bg-purple-500 group-hover:text-black transition-colors">Detail</span>
+                        </div>
+                        <p id="totalCebanCount" class="text-lg font-extrabold text-white">0 Pcs</p>
+                        <p class="text-[10px] text-gray-400 mt-1">Promo Ceban Terjual</p>
+                    </div>
+
+                </div>
+
+                <!-- AREA DETAIL TABEL DINAMIS -->
+                <div id="detailPromoSection" class="hidden bg-gray-800 rounded-xl border border-gray-700 p-4 space-y-3">
+                    <div class="flex justify-between items-center border-b border-gray-700 pb-2">
+                        <h3 id="detailPromoTitle" class="text-sm font-bold text-yellow-400 flex items-center gap-1.5">
+                            📋 Rincian Item Paket Promo
+                        </h3>
+                        <span id="detailItemCountBadge" class="text-xs px-2 py-0.5 bg-yellow-900/50 border border-yellow-600/40 rounded text-yellow-300 font-mono">
+                            0 Item Promo
+                        </span>
+                    </div>
+
+                    <div class="overflow-x-auto rounded-lg border border-gray-700">
+                        <table class="w-full text-left text-sm text-gray-300">
+                            <thead class="bg-gray-700 text-yellow-400 uppercase text-xs">
+                                <tr>
+                                    <th class="p-3">Kode PLU</th>
+                                    <th class="p-3">Deskripsi Produk</th>
+                                    <th class="p-3 text-center">Total Paket Terjual</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tablePromoDetailBody" class="divide-y divide-gray-700">
+                                <tr>
+                                    <td colspan="3" class="p-4 text-center text-gray-400 text-xs">Klik salah satu kartu promo di atas untuk melihat rincian.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- MODAL VERIFIKASI PASSWORD SETORAN -->
+    <div id="passwordModal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+        <div class="bg-gray-800 border border-gray-700 rounded-xl p-6 max-w-xs w-full shadow-2xl space-y-4 text-center">
+            <div class="text-2xl">🔒</div>
+            <h3 class="font-bold text-white text-md">Akses Terkunci</h3>
+            <p class="text-xs text-gray-400">Masukkan Password untuk membuka Menu Cek Setoran Kasir:</p>
+            
+            <input type="password" id="passInput" maxlength="2" placeholder="-- " 
+                   onkeydown="if(event.key==='Enter') verifikasiPassword()"
+                   class="w-full p-2.5 bg-gray-900 border border-gray-600 rounded-lg text-center font-mono text-lg font-bold text-yellow-400 focus:outline-none focus:border-yellow-400">
+            
+            <p id="passErrorMsg" class="text-xs text-red-400 hidden font-medium">⚠️ Password Salah!</p>
+
+            <div class="flex gap-2">
+                <button onclick="tutupPasswordModal()" class="w-1/2 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-xs font-semibold text-gray-300">Batal</button>
+                <button onclick="verifikasiPassword()" class="w-1/2 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-xs font-bold text-white">Buka</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const config = { locateFile: filename => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/${filename}` };
+        let activeDb = null;
+        let currentActivePromo = null;
+        let currentSelectedMenu = null;
+
+        // EKSPRESI HELPER SQL UNTUK KONVERSI DD/MM/YYYY MENJADI YYYY-MM-DD
+        const SQL_DATE_EXPR = (col) => `
+            CASE 
+                WHEN ${col} LIKE '%/%/%' THEN 
+                    substr(${col}, 7, 4) || '-' || substr(${col}, 4, 2) || '-' || substr(${col}, 1, 2)
+                WHEN ${col} LIKE '%-%-%' THEN 
+                    substr(${col}, 1, 10)
+                ELSE ${col}
+            END
+        `;
+
+        let promoStore = {
+            psm: { totalPackages: 0, groupResults: [] },
+            pwp: { totalPackages: 0, groupResults: [] },
+            serbagratis: { totalPackages: 0, groupResults: [] },
+            sejagat: { totalPackages: 0, groupResults: [] },
+            sueger: { totalPackages: 0, groupResults: [] },
+            ceban: { totalPackages: 0, groupResults: [] }
+        };
+
+        document.getElementById('zipInput').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const statusDiv = document.getElementById('status');
+            statusDiv.classList.remove('hidden');
+
+            try {
+                const zip = await JSZip.loadAsync(file);
+                let dbFileBytes = null;
+
+                for (let filename in zip.files) {
+                    if (filename.endsWith('.db')) {
+                        dbFileBytes = await zip.files[filename].async("uint8array");
+                        break;
+                    }
+                }
+
+                if (!dbFileBytes) {
+                    alert("Gagal: Tidak ditemukan file database (.db) di dalam ZIP ini!");
+                    statusDiv.classList.add('hidden');
+                    return;
+                }
+
+                const SQL = await initSqlJs(config);
+                activeDb = new SQL.Database(dbFileBytes);
+
+                // Populate Dropdown Filter Tanggal dan Kasir
+                populateFilterDropdowns();
+
+                statusDiv.classList.add('hidden');
+                document.getElementById('uploadSection').classList.add('hidden');
+                document.getElementById('filterSection').classList.remove('hidden');
+                document.getElementById('menuSection').classList.remove('hidden');
+
+            } catch (err) {
+                console.error(err);
+                alert("Terjadi error saat membaca database.");
+                statusDiv.classList.add('hidden');
+            }
+        });
+
+        // FUNGSI ISI DROPDOWN FILTER TANGGAL DAN KASIR SECARA DINAMIS
+        function populateFilterDropdowns() {
+            if(!activeDb) return;
+
+            const dateSelect = document.getElementById('filterDateSelect');
+            const userSelect = document.getElementById('filterUserSelect');
+
+            dateSelect.innerHTML = `<option value="ALL">Semua Tanggal Transaksi</option>`;
+            userSelect.innerHTML = `<option value="ALL">Semua Kasir</option>`;
+
+            try {
+                // Ambil daftar Tanggal unik dari tx_tsale menggunakan konversi tanggal
+                const sqlQueryDates = `
+                    SELECT DISTINCT ${SQL_DATE_EXPR('date_tx')} AS tgl 
+                    FROM tx_tsale 
+                    WHERE date_tx IS NOT NULL AND date_tx != '' 
+                    ORDER BY tgl DESC;
+                `;
+                const datesRes = activeDb.exec(sqlQueryDates);
+                if(datesRes[0] && datesRes[0].values) {
+                    datesRes[0].values.forEach(row => {
+                        if(row[0] && row[0] !== 'null') {
+                            dateSelect.innerHTML += `<option value="${row[0]}">${row[0]}</option>`;
+                        }
+                    });
+                }
+
+                // Ambil daftar Kasir unik dari tx_tsale
+                const usersRes = activeDb.exec(`SELECT DISTINCT user_id FROM tx_tsale WHERE user_id IS NOT NULL AND user_id != '' ORDER BY user_id ASC;`);
+                if(usersRes[0] && usersRes[0].values) {
+                    usersRes[0].values.forEach(row => {
+                        if(row[0]) userSelect.innerHTML += `<option value="${row[0]}">Kasir NIK: ${row[0]}</option>`;
+                    });
+                }
+            } catch (e) {
+                console.warn("Gagal mengekstrak opsi filter:", e);
+            }
+        }
+
+        function getFilterConditions(tableName = 'tx_tsale') {
+            const selectedDate = document.getElementById('filterDateSelect').value;
+            const selectedUser = document.getElementById('filterUserSelect').value;
+
+            let conditions = [];
+            let params = [];
+
+            if (selectedDate !== "ALL") {
+                conditions.push(`${SQL_DATE_EXPR(tableName + '.date_tx')} = ?`);
+                params.push(selectedDate);
+            }
+
+            if (selectedUser !== "ALL") {
+                conditions.push(`${tableName}.user_id = ?`);
+                params.push(selectedUser);
+            }
+
+            const whereClause = conditions.length > 0 ? "WHERE " + conditions.join(" AND ") : "";
+            return { whereClause, params };
+        }
+
+        function onFilterChange() {
+            if(currentSelectedMenu) {
+                switchMenu(currentSelectedMenu, true);
+            }
+        }
+
+        // FUNGSI MODAL & VERIFIKASI PASSWORD
+        function mintaPasswordSetoran() {
+            const modal = document.getElementById('passwordModal');
+            const input = document.getElementById('passInput');
+            const err = document.getElementById('passErrorMsg');
+            
+            input.value = "";
+            err.classList.add('hidden');
+            modal.classList.remove('hidden');
+            setTimeout(() => input.focus(), 100);
+        }
+
+        function tutupPasswordModal() {
+            document.getElementById('passwordModal').classList.add('hidden');
+        }
+
+        function verifikasiPassword() {
+            const inputVal = document.getElementById('passInput').value.trim();
+            const currentMinute = new Date().getMinutes();
+            const correctPass1 = String(currentMinute).padStart(2, '0');
+            const correctPass2 = String(currentMinute);
+
+            if (inputVal === correctPass1 || inputVal === correctPass2) {
+                tutupPasswordModal();
+                bukaPanelSetoran();
+            } else {
+                const err = document.getElementById('passErrorMsg');
+                err.classList.remove('hidden');
+                document.getElementById('passInput').value = "";
+                document.getElementById('passInput').focus();
+            }
+        }
+
+        function bukaPanelSetoran() {
+            currentSelectedMenu = 'setoran';
+            document.getElementById('menuSection').classList.add('hidden');
+            document.getElementById('outputArea').classList.remove('hidden');
+
+            document.getElementById('panelSetoran').classList.add('hidden');
+            document.getElementById('panelMember').classList.add('hidden');
+            document.getElementById('panelQty').classList.add('hidden');
+            document.getElementById('panelPromoSummary').classList.add('hidden');
+
+            document.getElementById('currentMenuTitle').innerText = "💰 Analisis Setoran Kasir";
+            document.getElementById('panelSetoran').classList.remove('hidden');
+            prosesMenuSetoran();
+        }
+
+        // PROSES MENU 1: SETORAN KASIR (Grup Berdasarkan date_tx dan user_id)
+        function prosesMenuSetoran() {
+            if(!activeDb) return;
+
+            const { whereClause, params } = getFilterConditions('tx_tsale');
+
+            // Tabel 1: Informasi Kasir per Tanggal & User
+            const query1 = `
+                SELECT ${SQL_DATE_EXPR('date_tx')} AS tgl, user_id, COUNT(*), SUM(CASE WHEN cust_id IS NOT NULL AND cust_id != '' THEN 1 ELSE 0 END) 
+                FROM tx_tsale 
+                ${whereClause} 
+                GROUP BY tgl, user_id 
+                ORDER BY tgl DESC, user_id ASC;
+            `;
+            const stmt1 = activeDb.prepare(query1);
+            stmt1.bind(params);
+            const t1Body = document.getElementById('tableKasirBody');
+            t1Body.innerHTML = "";
+            while(stmt1.step()) {
+                const row = stmt1.get();
+                t1Body.innerHTML += `<tr class="hover:bg-gray-700"><td class="p-3 font-mono text-yellow-400">${row[0]}</td><td class="p-3 font-mono text-cyan-300">${row[1]}</td><td class="p-3">${row[2]}</td><td class="p-3">${row[3]}</td></tr>`;
+            }
+            stmt1.free();
+
+            // Tabel 2: Rincian Nominal Uang per Tanggal & User
+            const query2 = `
+                SELECT ${SQL_DATE_EXPR('t.date_tx')} AS tgl, t.user_id, SUM(t.cash - t.change_pay), 
+                       IFNULL((SELECT SUM(amount) FROM tx_tsale_card WHERE user_id = t.user_id AND ${SQL_DATE_EXPR('date_tx')} = ${SQL_DATE_EXPR('t.date_tx')}), 0), 
+                       IFNULL((SELECT SUM(cash_out) FROM tx_tsale_card WHERE user_id = t.user_id AND ${SQL_DATE_EXPR('date_tx')} = ${SQL_DATE_EXPR('t.date_tx')}), 0) 
+                FROM tx_tsale t 
+                ${whereClause.replace(/tx_tsale\./g, 't.')} 
+                GROUP BY tgl, t.user_id 
+                ORDER BY tgl DESC, t.user_id ASC;
+            `;
+            const stmt2 = activeDb.prepare(query2);
+            stmt2.bind(params);
+            const t2Body = document.getElementById('tableNominalBody');
+            t2Body.innerHTML = "";
+            const formatRupiah = (val) => "Rp " + Number(val).toLocaleString('id-ID');
+            while(stmt2.step()) {
+                const row = stmt2.get();
+                t2Body.innerHTML += `<tr class="hover:bg-gray-700"><td class="p-3 font-mono text-yellow-400">${row[0]}</td><td class="p-3 font-mono text-cyan-300">${row[1]}</td><td class="p-3 text-emerald-400 font-bold">${formatRupiah(row[2])}</td><td class="p-3 text-cyan-400">${formatRupiah(row[3])}</td><td class="p-3 text-purple-400">${formatRupiah(row[4])}</td></tr>`;
+            }
+            stmt2.free();
+            
+            // Tabel 3: Rincian Delivery Order (SAPA) per Tanggal & User
+            const query3 = `
+                SELECT ${SQL_DATE_EXPR('date_tx')} AS tgl, user_id, 
+                       SUM(CASE WHEN sender_nik IS NOT NULL AND sender_nik != '' THEN 1 ELSE 0 END) AS [Jml Struk], 
+                       SUM(CASE WHEN sender_nik IS NOT NULL AND sender_nik != '' THEN (cash - change_pay) ELSE 0 END) AS [Total COD] 
+                FROM tx_tsale 
+                ${whereClause} 
+                GROUP BY tgl, user_id 
+                ORDER BY tgl DESC, user_id ASC;
+            `;
+            const stmt3 = activeDb.prepare(query3);
+            stmt3.bind(params);
+            const t3Body = document.getElementById('tableVoucherBody');
+            t3Body.innerHTML = "";
+            while(stmt3.step()) {
+                const row = stmt3.get();
+                t3Body.innerHTML += `<tr class="hover:bg-gray-700"><td class="p-3 font-mono text-yellow-400">${row[0]}</td><td class="p-3 font-mono text-cyan-300">${row[1]}</td><td class="p-3">${row[2]}</td><td class="p-3 text-yellow-400 font-bold">${formatRupiah(row[3])}</td></tr>`;
+            }
+            stmt3.free();
+        }
+
+        // PROSES MENU 2: MEMBER
+        function cariMember() {
+            if(!activeDb) return;
+            const keyword = document.getElementById('memberSearchInput').value.trim();
+            const tbody = document.getElementById('tableMemberBody');
+            if(keyword === "") {
+                tbody.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-gray-400 text-xs">Ketik kata kunci di atas untuk mencari data.</td></tr>`;
+                return;
+            }
+
+            const { whereClause, params } = getFilterConditions('s');
+            let extraWhere = whereClause ? `${whereClause} AND` : "WHERE";
+
+            const query = `
+                SELECT DISTINCT ${SQL_DATE_EXPR('s.date_tx')} AS tgl, u.member_name, u.no_member, s.phone
+                FROM tx_usi u
+                JOIN tx_tsale s ON u.no_member = s.cust_id
+                ${extraWhere} (u.member_name LIKE '%' || ? || '%' OR s.phone LIKE '%' || ? || '%')
+                ORDER BY tgl DESC LIMIT 50;
+            `;
+            try {
+                const stmt = activeDb.prepare(query);
+                stmt.bind([...params, keyword, keyword]);
+                tbody.innerHTML = "";
+                let hasData = false;
+                while(stmt.step()) {
+                    hasData = true;
+                    const row = stmt.getAsObject();
+                    tbody.innerHTML += `
+                        <tr class="hover:bg-gray-700">
+                            <td class="p-3 font-mono text-yellow-400">${row.tgl || '-'}</td>
+                            <td class="p-3 font-semibold text-yellow-300">${row.member_name || '-'}</td>
+                            <td class="p-3 font-mono text-cyan-400">${row.no_member || '-'}</td>
+                            <td class="p-3 font-mono text-emerald-400">${row.phone || '-'}</td>
+                        </tr>`;
+                }
+                stmt.free();
+                if(!hasData) tbody.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-red-400 text-xs">Data tidak ditemukan.</td></tr>`;
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        // PROSES MENU 3: QTY ITEM JUAL
+        function cariQtyItem() {
+            if(!activeDb) return;
+            const inputPlu = document.getElementById('pluSearchInput').value.trim();
+            const tbody = document.getElementById('tableQtyBody');
+            if(inputPlu === "") {
+                tbody.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-gray-400 text-xs">Ketik Kode PLU di atas untuk melihat total penjualan.</td></tr>`;
+                return;
+            }
+
+            const selectedDate = document.getElementById('filterDateSelect').value;
+            const selectedUser = document.getElementById('filterUserSelect').value;
+
+            let filterConds = [];
+            let filterParams = [inputPlu, inputPlu];
+
+            if (selectedDate !== "ALL") {
+                filterConds.push(`${SQL_DATE_EXPR('date_tx')} = ?`);
+                filterParams.push(selectedDate);
+            }
+            if (selectedUser !== "ALL") {
+                filterConds.push("user_id = ?");
+                filterParams.push(selectedUser);
+            }
+
+            let extraFilter = filterConds.length > 0 ? "AND " + filterConds.join(" AND ") : "";
+
+            const query = `
+                SELECT plu AS db_raw_plu, SUM(qty_all) AS total_qty 
+                FROM log_sales_cashier 
+                WHERE (CAST(plu AS TEXT) = ? 
+                   OR CAST(CASE WHEN CAST(plu AS TEXT) LIKE '%2' THEN SUBSTR(CAST(plu AS TEXT), 1, LENGTH(CAST(plu AS TEXT)) - 1) ELSE CAST(plu AS TEXT) END AS TEXT) = ?)
+                ${extraFilter}
+                GROUP BY db_raw_plu;
+            `;
+            try {
+                const stmt = activeDb.prepare(query);
+                stmt.bind(filterParams);
+                tbody.innerHTML = "";
+                let hasData = false;
+                while(stmt.step()) {
+                    hasData = true;
+                    const row = stmt.getAsObject();
+                    tbody.innerHTML += `
+                        <tr class="hover:bg-gray-700">
+                            <td class="p-3 font-mono text-gray-400">${inputPlu}</td>
+                            <td class="p-3 font-mono text-cyan-400 font-semibold">${row.db_raw_plu}</td>
+                            <td class="p-3 font-bold text-emerald-400 text-base">${Number(row.total_qty).toLocaleString('id-ID')} Pcs</td>
+                        </tr>`;
+                }
+                stmt.free();
+                if(!hasData) tbody.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-red-400 text-xs">PLU "${inputPlu}" tidak ditemukan pada filter ini.</td></tr>`;
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        // FUNGSI UTAMA KALKULASI GENERIK PROMO (DENGAN FILTER DATE_TX DAN USER_ID)
+        async function hitungGenericPromo(promoType) {
+            if(!activeDb) return;
+
+            const fileName = `./${promoType}.csv`;
+            
+            let cardElId = 'totalPsmCount';
+            if (promoType === 'pwp') cardElId = 'totalPwpCount';
+            if (promoType === 'serbagratis') cardElId = 'totalSerbaGratisCount';
+            if (promoType === 'sejagat') cardElId = 'totalSejagatCount';
+            if (promoType === 'sueger') cardElId = 'totalSuegerCount';
+            if (promoType === 'ceban') cardElId = 'totalCebanCount';
+
+            const cardEl = document.getElementById(cardElId);
+            cardEl.innerText = "⏳ Memproses...";
+            
+            promoStore[promoType].totalPackages = 0;
+            promoStore[promoType].groupResults = [];
+
+            try {
+                const response = await fetch(fileName);
+                if(!response.ok) {
+                    cardEl.innerText = "CSV Hilang";
+                    return;
+                }
+
+                const csvText = await response.text();
+                const cleanCsvText = csvText.replace(/\r/g, '').trim();
+                const lines = cleanCsvText.split('\n');
+
+                if(lines.length <= 1) {
+                    cardEl.innerText = "0 Paket";
+                    return;
+                }
+
+                const groupsMap = {};
+
+                for (let i = 1; i < lines.length; i++) {
+                    const rowStr = lines[i].trim();
+                    if (!rowStr) continue;
+
+                    const delimiter = rowStr.includes(';') ? ';' : ',';
+                    const cols = rowStr.split(delimiter);
+
+                    const cleanPlu = cols[0] ? cols[0].trim() : '';
+                    const cleanNama = cols[1] ? cols[1].trim() : '-';
+                    const groupId = cols[2] ? cols[2].trim() : cleanPlu;
+                    const role = cols[3] ? cols[3].trim().toUpperCase() : 'BUY';
+                    const targetQty = cols[4] ? parseInt(cols[4].trim()) || 1 : 1;
+
+                    if(!cleanPlu) continue;
+
+                    if (!groupsMap[groupId]) {
+                        groupsMap[groupId] = {
+                            groupId: groupId,
+                            buyPlus: [],
+                            getPlus: [],
+                            buyTarget: 1,
+                            getTarget: 1,
+                            descs: []
+                        };
+                    }
+
+                    if (role === 'GET') {
+                        groupsMap[groupId].getPlus.push(cleanPlu);
+                        groupsMap[groupId].getTarget = targetQty;
+                    } else {
+                        groupsMap[groupId].buyPlus.push(cleanPlu);
+                        groupsMap[groupId].buyTarget = targetQty;
+                    }
+
+                    groupsMap[groupId].descs.push(cleanNama);
+                }
+
+                let priceCondition = "";
+                if (promoType === 'sueger' || promoType === 'ceban') {
+                    priceCondition = `AND (CAST(IFNULL(special_disc, 0) AS NUMERIC) > 0)`;
+                }
+
+                const selectedDate = document.getElementById('filterDateSelect').value;
+                const selectedUser = document.getElementById('filterUserSelect').value;
+
+                let dateUserFilter = "";
+                let queryBindParams = [];
+
+                if (selectedDate !== "ALL") {
+                    dateUserFilter += ` AND ${SQL_DATE_EXPR('date_tx')} = ?`;
+                    queryBindParams.push(selectedDate);
+                }
+                if (selectedUser !== "ALL") {
+                    dateUserFilter += ` AND user_id = ?`;
+                    queryBindParams.push(selectedUser);
+                }
+
+                for (const groupId in groupsMap) {
+                    const group = groupsMap[groupId];
+                    const isCrossPromo = group.getPlus.length > 0;
+                    const allPlus = [...group.buyPlus, ...group.getPlus];
+                    const pluPlaceholders = allPlus.map(() => '?').join(',');
+
+                    const sqlQuery = `
+                        SELECT 
+                            bill_no,
+                            CAST(plu AS TEXT) AS raw_plu,
+                            SUM(CAST(qty AS NUMERIC)) AS item_qty
+                        FROM tx_trans
+                        WHERE (
+                            CAST(plu AS TEXT) IN (${pluPlaceholders})
+                            OR CAST(CASE WHEN CAST(plu AS TEXT) LIKE '%2' THEN SUBSTR(CAST(plu AS TEXT), 1, LENGTH(CAST(plu AS TEXT)) - 1) ELSE CAST(plu AS TEXT) END AS TEXT) IN (${pluPlaceholders})
+                        )
+                        AND (referensi IS NULL OR TRIM(CAST(referensi AS TEXT)) = '')
+                        ${priceCondition}
+                        ${dateUserFilter}
+                        GROUP BY bill_no, raw_plu;
+                    `;
+
+                    const stmt = activeDb.prepare(sqlQuery);
+                    stmt.bind([...allPlus, ...allPlus, ...queryBindParams]);
+
+                    const billMap = {};
+
+                    while (stmt.step()) {
+                        const row = stmt.getAsObject();
+                        const billNo = row.bill_no;
+                        const qty = row.item_qty || 0;
+                        let cleanPlu = row.raw_plu;
+
+                        if (cleanPlu.endsWith('2')) cleanPlu = cleanPlu.slice(0, -1);
+
+                        if (!billMap[billNo]) billMap[billNo] = { buyQty: 0, getQty: 0 };
+
+                        if (group.buyPlus.includes(cleanPlu)) {
+                            billMap[billNo].buyQty += qty;
+                        } else if (group.getPlus.includes(cleanPlu)) {
+                            billMap[billNo].getQty += qty;
+                        }
+                    }
+                    stmt.free();
+
+                    let totalGroupPackages = 0;
+
+                    for (const billNo in billMap) {
+                        const data = billMap[billNo];
+
+                        if (isCrossPromo) {
+                            const buyPacks = Math.floor(data.buyQty / group.buyTarget);
+                            const getPacks = Math.floor(data.getQty / group.getTarget);
+                            totalGroupPackages += Math.min(buyPacks, getPacks);
+                        } else {
+                            if (data.buyQty >= group.buyTarget) {
+                                totalGroupPackages += Math.floor(data.buyQty / group.buyTarget);
+                            }
+                        }
+                    }
+
+                    if (totalGroupPackages > 0) {
+                        promoStore[promoType].totalPackages += totalGroupPackages;
+                        promoStore[promoType].groupResults.push({
+                            groupId: group.groupId,
+                            plusStr: allPlus.join(' / '),
+                            descs: group.descs.join(' / '),
+                            packages: totalGroupPackages
+                        });
+                    }
+                }
+
+                cardEl.innerText = `${promoStore[promoType].totalPackages.toLocaleString('id-ID')} Pcs`;
+
+            } catch (err) {
+                console.error(`Error saat menghitung ${promoType}:`, err);
+                cardEl.innerText = "Error Fetch";
+            }
+        }
+
+        // FUNGSI TAMPILKAN/TUTUP RINCIAN DETAIL PROMO
+        function tampilkanDetailPromo(promoType) {
+            const detailSection = document.getElementById('detailPromoSection');
+            const titleEl = document.getElementById('detailPromoTitle');
+            const tbody = document.getElementById('tablePromoDetailBody');
+            const badgeEl = document.getElementById('detailItemCountBadge');
+
+            if (currentActivePromo === promoType && !detailSection.classList.contains('hidden')) {
+                detailSection.classList.add('hidden');
+                currentActivePromo = null;
+                return;
+            }
+
+            currentActivePromo = promoType;
+            const data = promoStore[promoType];
+
+            detailSection.classList.remove('hidden');
+            tbody.innerHTML = "";
+
+            let promoLabel = "PSM";
+            if (promoType === 'pwp') promoLabel = "PWP";
+            if (promoType === 'serbagratis') promoLabel = "Serba Gratis";
+            if (promoType === 'sejagat') promoLabel = "Sejagat";
+            if (promoType === 'sueger') promoLabel = "Sueger";
+            if (promoType === 'ceban') promoLabel = "Ceban";
+
+            titleEl.innerText = `📋 Rincian Item Promo ${promoLabel} yang Terjual`;
+
+            if (data.groupResults.length === 0) {
+                badgeEl.innerText = "0 Jenis Item Promo";
+                tbody.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-gray-400 text-xs">Tidak ada paket promo ${promoLabel} yang memenuhi syarat Terjual di data ini.</td></tr>`;
+                return;
+            }
+
+            badgeEl.innerText = `${data.groupResults.length} Jenis Item Terjual`;
+
+            data.groupResults.forEach(group => {
+                tbody.innerHTML += `
+                    <tr class="hover:bg-gray-700">
+                        <td class="p-3 font-mono text-cyan-400 font-semibold">${group.plusStr}</td>
+                        <td class="p-3 text-gray-200 font-medium text-xs">${group.descs}</td>
+                        <td class="p-3 text-center font-bold text-yellow-400 text-base">
+                            ${group.packages.toLocaleString('id-ID')} Pcs
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        // NAVIGASI PANEL MENU
+        function switchMenu(menuName, forceRefresh = false) {
+            if (menuName === 'setoran' && !forceRefresh) {
+                mintaPasswordSetoran();
+                return;
+            }
+
+            currentSelectedMenu = menuName;
+
+            document.getElementById('menuSection').classList.add('hidden');
+            document.getElementById('outputArea').classList.remove('hidden');
+
+            document.getElementById('panelSetoran').classList.add('hidden');
+            document.getElementById('panelMember').classList.add('hidden');
+            document.getElementById('panelQty').classList.add('hidden');
+            document.getElementById('panelPromoSummary').classList.add('hidden');
+
+            const titleSpan = document.getElementById('currentMenuTitle');
+
+            if (menuName === 'setoran') {
+                titleSpan.innerText = "💰 Analisis Setoran Kasir";
+                document.getElementById('panelSetoran').classList.remove('hidden');
+                prosesMenuSetoran();
+            } else if (menuName === 'member') {
+                titleSpan.innerText = "📱 Data No HP Member";
+                document.getElementById('panelMember').classList.remove('hidden');
+                cariMember();
+            } else if (menuName === 'qty') {
+                titleSpan.innerText = "📦 Data Qty Item Jual";
+                document.getElementById('panelQty').classList.remove('hidden');
+                cariQtyItem();
+            } else if (menuName === 'promoSummary') {
+                titleSpan.innerText = "🏷️ Rekapitulasi Penjualan Promo";
+                document.getElementById('panelPromoSummary').classList.remove('hidden');
+                hitungGenericPromo('psm');
+                hitungGenericPromo('pwp');
+                hitungGenericPromo('serbagratis');
+                hitungGenericPromo('sejagat');
+                hitungGenericPromo('sueger');
+                hitungGenericPromo('ceban');
+            }
+        }
+
+        function backToMenu() {
+            document.getElementById('outputArea').classList.add('hidden');
+            document.getElementById('menuSection').classList.remove('hidden');
+            document.getElementById('detailPromoSection').classList.add('hidden');
+            currentActivePromo = null;
+            currentSelectedMenu = null;
+        }
+
+        function resetApp() {
+            activeDb = null;
+            currentActivePromo = null;
+            currentSelectedMenu = null;
+            document.getElementById('zipInput').value = "";
+            document.getElementById('memberSearchInput').value = "";
+            document.getElementById('pluSearchInput').value = "";
+            document.getElementById('filterSection').classList.add('hidden');
+            document.getElementById('menuSection').classList.add('hidden');
+            document.getElementById('outputArea').classList.add('hidden');
+            document.getElementById('uploadSection').classList.remove('hidden');
+            document.getElementById('detailPromoSection').classList.add('hidden');
+        }
+    </script>
+</body>
+</html>
