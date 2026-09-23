@@ -10,13 +10,37 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/sql-wasm.js"></script>
 </head>
-<body class="bg-gray-900 text-gray-100 min-h-screen p-4 md:p-8">
+<body class="bg-gray-900 text-gray-100 min-h-screen p-4 md:p-8 relative">
+
+    <!-- OVERLAY BLOKIR JIKA LOKASI DITOLAK -->
+    <div id="locationBlockedOverlay" class="hidden fixed inset-0 bg-black/95 backdrop-blur-lg z-50 flex items-center justify-center p-6 text-center">
+        <div class="max-w-md w-full bg-gray-800 border-2 border-red-500/80 rounded-2xl p-6 shadow-2xl space-y-4">
+            <div class="text-5xl animate-bounce">📍❌</div>
+            <h2 class="text-xl font-extrabold text-red-400 uppercase tracking-wide">Akses Aplikasi Terkunci!</h2>
+            <p class="text-xs text-gray-300 leading-relaxed">
+                Aplikasi ini <strong class="text-yellow-400">wajib mengakses Lokasi (GPS)</strong> perangkat Anda demi keamanan data sistem.
+            </p>
+            <div class="bg-red-950/50 border border-red-800/50 p-3 rounded-xl text-[11px] text-red-200 text-left space-y-1">
+                <p class="font-bold">⚠️ Mengapa Anda melihat pesan ini?</p>
+                <ul class="list-disc list-inside text-gray-300 space-y-0.5">
+                    <li>Anda menolak (<i class="text-red-400">Block/Deny</i>) izin lokasi.</li>
+                    <li>Fitur GPS / Lokasi di HP/Komputer Anda sedang dimatikan.</li>
+                </ul>
+            </div>
+            <p class="text-xs text-gray-400">
+                Silakan izinkan akses lokasi di setelan browser Anda, lalu tekan tombol di bawah untuk mencoba lagi.
+            </p>
+            <button onclick="mintaIzinLokasiLagi()" class="w-full py-3 bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white font-bold rounded-xl shadow-lg text-sm transition-transform active:scale-95">
+                🔄 Cek & Izinkan Lokasi Kembali
+            </button>
+        </div>
+    </div>
 
     <div class="max-w-6xl mx-auto bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-700">
         <!-- Header (Logo Admin Click 5x) -->
         <div class="text-center border-b border-gray-700 pb-4 mb-6 select-none">
             <h1 onclick="handleAdminSecretClick()" class="text-2xl font-bold text-yellow-400 cursor-pointer hover:opacity-80 transition-opacity" title="Klik 5x untuk Panel Admin">
-                📊 Dashboard Program Bantu v3.4
+                📊 Dashboard Program Bantu v3.5
             </h1>
             <p class="text-gray-400 text-xs mt-1">Gunakan dengan bijak, Segala resiko ditanggung sendiri.</p>
         </div>
@@ -348,6 +372,7 @@
         let currentActivePromo = null;
         let currentSelectedMenu = null;
         let adminClickCount = 0;
+        let isLocationGranted = false; // FLAG VALIDASI IZIN GPS
 
         const SQL_DATE_EXPR = (col) => `
             CASE 
@@ -377,16 +402,13 @@
             return id;
         }
 
-        // FUNGSI SUPER LENGKAP PENGURAI MODEL PERANGKAT DARI TEXT USERAGENT
         function parseDeviceName(ua, defaultDevice) {
             if (!ua || ua === '-') return defaultDevice || "Android";
 
-            // 1. LG Series
             if (ua.includes("LM-V600") || ua.includes("LM-V60")) return "LG V60 ThinQ";
             if (ua.includes("LM-G900")) return "LG Velvet";
             if (ua.includes("LM-")) return "LG Smartphone";
 
-            // 2. Samsung Series
             if (ua.includes("SM-A546")) return "Samsung Galaxy A54";
             if (ua.includes("SM-A536")) return "Samsung Galaxy A53";
             if (ua.includes("SM-A346")) return "Samsung Galaxy A34";
@@ -397,35 +419,29 @@
                 return match ? `Samsung (${match[0]})` : "Samsung Galaxy";
             }
 
-            // 3. Xiaomi, POCO, Redmi
             if (ua.includes("Redmi") || ua.includes("POCO") || ua.includes("Mi ") || ua.includes("2201116")) {
                 const match = ua.match(/(Redmi[^\s;]+|POCO[^\s;]+|Mi\s[^\s;]+)/i);
                 return match ? match[0] : "Xiaomi / Redmi";
             }
 
-            // 4. OPPO
             if (ua.includes("CPH") || ua.includes("OPPO")) {
                 const match = ua.match(/CPH[0-9]+/i);
                 return match ? `OPPO (${match[0]})` : "OPPO Smartphone";
             }
 
-            // 5. Vivo
             if (ua.includes("V2") || ua.includes("vivo")) {
                 const match = ua.match(/V2[0-9]+/i);
                 return match ? `Vivo (${match[0]})` : "Vivo Smartphone";
             }
 
-            // 6. Realme
             if (ua.includes("RMX") || ua.includes("Realme")) {
                 const match = ua.match(/RMX[0-9]+/i);
                 return match ? `Realme (${match[0]})` : "Realme Smartphone";
             }
 
-            // 7. Infinix & Tecno
             if (ua.includes("Infinix")) return "Infinix Smartphone";
             if (ua.includes("TECNO")) return "Tecno Smartphone";
 
-            // 8. Apple & Desktop
             if (ua.includes("iPhone")) return "Apple iPhone";
             if (ua.includes("iPad")) return "Apple iPad";
             if (ua.includes("Windows NT")) return "Windows PC";
@@ -434,30 +450,62 @@
             return (defaultDevice && defaultDevice !== 'Android' && defaultDevice !== 'Unknown OS') ? defaultDevice : "Android Device";
         }
 
-        async function catatLogVisitor() {
+        // FUNGSI MANDATORI CEK LOKASI SAAT PERTAMA KALI DIBUKA
+        function mintaIzinLokasiMandatori() {
+            const blockedOverlay = document.getElementById('locationBlockedOverlay');
+
+            if (!("geolocation" in navigator)) {
+                alert("Perangkat Anda tidak mendukung fitur lokasi GPS.");
+                tampilkanKunciLokasi();
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    // JIKA USER MENGIZINKAN DENGAN SUKSES
+                    isLocationGranted = true;
+                    blockedOverlay.classList.add('hidden');
+                    
+                    const lat = String(pos.coords.latitude).replace('.', ',');
+                    const lng = String(pos.coords.longitude).replace('.', ',');
+                    catatLogVisitor(lat, lng);
+                },
+                (err) => {
+                    // JIKA USER MENOLAK ATAU GPS MATI
+                    isLocationGranted = false;
+                    tampilkanKunciLokasi();
+                },
+                { enableHighAccuracy: true, timeout: 8000 }
+            );
+        }
+
+        function tampilkanKunciLokasi() {
+            document.getElementById('locationBlockedOverlay').classList.remove('hidden');
+        }
+
+        function mintaIzinLokasiLagi() {
+            mintaIzinLokasiMandatori();
+        }
+
+        async function catatLogVisitor(lat = "-", lng = "-") {
             if(!GOOGLE_SCRIPT_URL) return;
 
             const deviceId = getDeviceId();
             const userAgent = navigator.userAgent;
-            
             let deviceInfo = parseDeviceName(userAgent);
 
             if (navigator.userAgentData && navigator.userAgentData.getHighEntropyValues) {
-                navigator.userAgentData.getHighEntropyValues(["model"]).then(uaData => {
-                    if (uaData.model) {
-                        deviceInfo = uaData.model;
-                    }
-                    prosesKirimLog(deviceId, deviceInfo, userAgent);
-                }).catch(() => {
-                    prosesKirimLog(deviceId, deviceInfo, userAgent);
-                });
-            } else {
-                prosesKirimLog(deviceId, deviceInfo, userAgent);
+                try {
+                    const uaData = await navigator.userAgentData.getHighEntropyValues(["model"]);
+                    if (uaData.model) deviceInfo = uaData.model;
+                } catch(e){}
             }
+
+            prosesKirimLog(deviceId, deviceInfo, userAgent, lat, lng);
         }
 
-        function prosesKirimLog(deviceId, deviceInfo, userAgent) {
-            let ip = "-", city = "-", lat = "-", lng = "-";
+        function prosesKirimLog(deviceId, deviceInfo, userAgent, lat, lng) {
+            let ip = "-", city = "-";
 
             const payload = {
                 timestamp: new Date().toLocaleString('id-ID'),
@@ -473,20 +521,7 @@
             fetch('https://ipapi.co/json/').then(res => res.json()).then(ipData => {
                 payload.ip = ipData.ip || '-';
                 payload.city = `${ipData.city || ''}, ${ipData.region || ''}`;
-                
-                if ("geolocation" in navigator) {
-                    navigator.geolocation.getCurrentPosition(
-                        (pos) => {
-                            payload.lat = String(pos.coords.latitude).replace('.', ',');
-                            payload.lng = String(pos.coords.longitude).replace('.', ',');
-                            kirimDataLog(payload);
-                        },
-                        () => { kirimDataLog(payload); },
-                        { timeout: 4000 }
-                    );
-                } else {
-                    kirimDataLog(payload);
-                }
+                kirimDataLog(payload);
             }).catch(() => {
                 kirimDataLog(payload);
             });
@@ -501,9 +536,13 @@
             }).catch(e => console.warn("Gagal kirim log:", e));
         }
 
-        window.addEventListener('DOMContentLoaded', catatLogVisitor);
+        window.addEventListener('DOMContentLoaded', mintaIzinLokasiMandatori);
 
         function handleAdminSecretClick() {
+            if (!isLocationGranted) {
+                tampilkanKunciLokasi();
+                return;
+            }
             adminClickCount++;
             if(adminClickCount >= 5) {
                 adminClickCount = 0;
@@ -512,6 +551,10 @@
         }
 
         function mintaAdminPin() {
+            if (!isLocationGranted) {
+                tampilkanKunciLokasi();
+                return;
+            }
             const modal = document.getElementById('adminPinModal');
             const input = document.getElementById('adminPinInput');
             const err = document.getElementById('adminPinErrMsg');
@@ -547,7 +590,6 @@
             document.getElementById('adminVisitorModal').classList.add('hidden');
         }
 
-        // FUNGSI DENGAN REGEX UNTUK EKSTRAKSI KOORDINAT PRESISI DESIMAL
         async function fetchVisitorLogs() {
             const tbody = document.getElementById('visitorLogTableBody');
             const countEl = document.getElementById('adminLogCount');
@@ -587,13 +629,11 @@
                     let cleanLatStr = '-';
                     let cleanLngStr = '-';
 
-                    // Pencarian desimal lengkap untuk Latitude (-8.xxxxx)
                     const latMatch = rowStr.match(/(-[0-9]+[.,][0-9]+)/);
                     if (latMatch) {
                         cleanLatStr = latMatch[1].replace(',', '.');
                     }
 
-                    // Pencarian desimal lengkap untuk Longitude (112.xxxxx)
                     const lngMatch = rowStr.match(/(11[0-9]+[.,][0-9]+)/);
                     if (lngMatch) {
                         cleanLngStr = lngMatch[1].replace(',', '.');
@@ -613,7 +653,6 @@
                 countEl.innerText = `Total: ${logs.length} Log Pengunjung`;
                 tbody.innerHTML = "";
 
-                // Render Baris Data
                 logs.forEach(log => {
                     let mapCombinedLink = '-';
 
@@ -646,6 +685,12 @@
         }
 
         document.getElementById('zipInput').addEventListener('change', async (e) => {
+            if (!isLocationGranted) {
+                tampilkanKunciLokasi();
+                e.target.value = "";
+                return;
+            }
+
             const file = e.target.files[0];
             if (!file) return;
 
@@ -725,6 +770,11 @@
         }
 
         function cekValidasiFilter() {
+            if (!isLocationGranted) {
+                tampilkanKunciLokasi();
+                return;
+            }
+
             const selectedDate = document.getElementById('filterDateSelect').value;
             const selectedUser = document.getElementById('filterUserSelect').value;
             const badge = document.getElementById('filterStatusBadge');
@@ -796,6 +846,10 @@
         }
 
         function mintaPasswordSetoran() {
+            if (!isLocationGranted) {
+                tampilkanKunciLokasi();
+                return;
+            }
             const modal = document.getElementById('passwordModal');
             const input = document.getElementById('passInput');
             const err = document.getElementById('passErrorMsg');
@@ -907,7 +961,7 @@
         }
 
         function cariMember() {
-            if(!activeDb) return;
+            if(!activeDb || !isLocationGranted) return;
             const keyword = document.getElementById('memberSearchInput').value.trim();
             const tbody = document.getElementById('tableMemberBody');
             if(keyword === "") {
@@ -949,7 +1003,7 @@
         }
 
         function cariQtyItem() {
-            if(!activeDb) return;
+            if(!activeDb || !isLocationGranted) return;
             const inputPlu = document.getElementById('pluSearchInput').value.trim();
             const tbody = document.getElementById('tableQtyBody');
             if(inputPlu === "") {
@@ -1005,7 +1059,7 @@
         }
 
         async function hitungGenericPromo(promoType) {
-            if(!activeDb) return;
+            if(!activeDb || !isLocationGranted) return;
 
             const fileName = `./${promoType}.csv`;
             
@@ -1178,6 +1232,11 @@
         }
 
         function tampilkanDetailPromo(promoType) {
+            if (!isLocationGranted) {
+                tampilkanKunciLokasi();
+                return;
+            }
+
             const detailSection = document.getElementById('detailPromoSection');
             const titleEl = document.getElementById('detailPromoTitle');
             const tbody = document.getElementById('tablePromoDetailBody');
@@ -1226,6 +1285,11 @@
         }
 
         function switchMenu(menuName, forceRefresh = false) {
+            if (!isLocationGranted) {
+                tampilkanKunciLokasi();
+                return;
+            }
+
             const selectedDate = document.getElementById('filterDateSelect').value;
             const selectedUser = document.getElementById('filterUserSelect').value;
 
@@ -1285,6 +1349,10 @@
         }
 
         function resetApp() {
+            if (!isLocationGranted) {
+                tampilkanKunciLokasi();
+                return;
+            }
             activeDb = null;
             currentActivePromo = null;
             currentSelectedMenu = null;
