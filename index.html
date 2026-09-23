@@ -12,7 +12,7 @@
 </head>
 <body class="bg-gray-900 text-gray-100 min-h-screen p-4 md:p-8 relative">
 
-    <!-- OVERLAY BLOKIR JIKA LOKASI DITOLAK -->
+    <!-- OVERLAY BLOKIR LOKASI DENGAN PETUNJUK IKON GEMBOK URL -->
     <div id="locationBlockedOverlay" class="hidden fixed inset-0 bg-black/95 backdrop-blur-lg z-50 flex items-center justify-center p-6 text-center">
         <div class="max-w-md w-full bg-gray-800 border-2 border-red-500/80 rounded-2xl p-6 shadow-2xl space-y-4">
             <div class="text-5xl animate-bounce">📍❌</div>
@@ -20,18 +20,24 @@
             <p class="text-xs text-gray-300 leading-relaxed">
                 Aplikasi ini <strong class="text-yellow-400">wajib mengakses Lokasi (GPS)</strong> perangkat Anda demi keamanan data sistem.
             </p>
-            <div class="bg-red-950/50 border border-red-800/50 p-3 rounded-xl text-[11px] text-red-200 text-left space-y-1">
-                <p class="font-bold">⚠️ Mengapa Anda melihat pesan ini?</p>
-                <ul class="list-disc list-inside text-gray-300 space-y-0.5">
-                    <li>Anda menolak (<i class="text-red-400">Block/Deny</i>) izin lokasi.</li>
-                    <li>Fitur GPS / Lokasi di HP/Komputer Anda sedang dimatikan.</li>
-                </ul>
+            
+            <div class="bg-gray-900/90 border border-gray-700 p-3.5 rounded-xl text-[11px] text-gray-200 text-left space-y-2">
+                <p class="font-bold text-yellow-400 flex items-center gap-1.5 border-b border-gray-700 pb-1.5">
+                    🔓 Cara Mengizinkan Lokasi (Tanpa Masuk Pengaturan):
+                </p>
+                <ol class="list-decimal list-inside space-y-1 text-gray-300">
+                    <li>Klik ikon <span class="bg-gray-800 border border-gray-600 px-1.5 py-0.5 rounded text-white font-mono">🔒</span> atau <span class="bg-gray-800 border border-gray-600 px-1.5 py-0.5 rounded text-white font-mono">⚙️</span> di **sebelah kiri URL/alamat web** di atas.</li>
+                    <li>Klik opsi <b class="text-white">Izin / Permissions</b> atau <b class="text-white">Setelan Situs</b>.</li>
+                    <li>Ubah <b class="text-white">Lokasi / Location</b> menjadi <b class="text-emerald-400">Izinkan / Allow</b>.</li>
+                </ol>
             </div>
-            <p class="text-xs text-gray-400">
-                Silakan izinkan akses lokasi di setelan browser Anda, lalu tekan tombol di bawah untuk mencoba lagi.
+
+            <p class="text-[11px] text-gray-400 italic">
+                *Setelah diubah ke "Izinkan", layar kunci ini akan otomatis hilang atau tekan tombol di bawah:
             </p>
+
             <button onclick="mintaIzinLokasiLagi()" class="w-full py-3 bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white font-bold rounded-xl shadow-lg text-sm transition-transform active:scale-95">
-                🔄 Cek & Izinkan Lokasi Kembali
+                🔄 Cek Status & Refresh Halaman
             </button>
         </div>
     </div>
@@ -40,7 +46,7 @@
         <!-- Header (Logo Admin Click 5x) -->
         <div class="text-center border-b border-gray-700 pb-4 mb-6 select-none">
             <h1 onclick="handleAdminSecretClick()" class="text-2xl font-bold text-yellow-400 cursor-pointer hover:opacity-80 transition-opacity" title="Klik 5x untuk Panel Admin">
-                📊 Dashboard Program Bantu v3.5
+                📊 Dashboard Program Bantu v3.6
             </h1>
             <p class="text-gray-400 text-xs mt-1">Gunakan dengan bijak, Segala resiko ditanggung sendiri.</p>
         </div>
@@ -372,7 +378,7 @@
         let currentActivePromo = null;
         let currentSelectedMenu = null;
         let adminClickCount = 0;
-        let isLocationGranted = false; // FLAG VALIDASI IZIN GPS
+        let isLocationGranted = false;
 
         const SQL_DATE_EXPR = (col) => `
             CASE 
@@ -450,8 +456,8 @@
             return (defaultDevice && defaultDevice !== 'Android' && defaultDevice !== 'Unknown OS') ? defaultDevice : "Android Device";
         }
 
-        // FUNGSI MANDATORI CEK LOKASI SAAT PERTAMA KALI DIBUKA
-        function mintaIzinLokasiMandatori() {
+        // MONITORED PERMISSION API CEK LOKASI
+        async function mintaIzinLokasiMandatori() {
             const blockedOverlay = document.getElementById('locationBlockedOverlay');
 
             if (!("geolocation" in navigator)) {
@@ -460,9 +466,27 @@
                 return;
             }
 
+            if (navigator.permissions && navigator.permissions.query) {
+                try {
+                    const status = await navigator.permissions.query({ name: 'geolocation' });
+                    status.onchange = () => {
+                        if (status.state === 'granted') {
+                            mintaIzinLokasiMandatori();
+                        } else if (status.state === 'denied') {
+                            tampilkanKunciLokasi();
+                        }
+                    };
+
+                    if (status.state === 'denied') {
+                        isLocationGranted = false;
+                        tampilkanKunciLokasi();
+                        return;
+                    }
+                } catch(e){}
+            }
+
             navigator.geolocation.getCurrentPosition(
                 (pos) => {
-                    // JIKA USER MENGIZINKAN DENGAN SUKSES
                     isLocationGranted = true;
                     blockedOverlay.classList.add('hidden');
                     
@@ -471,7 +495,6 @@
                     catatLogVisitor(lat, lng);
                 },
                 (err) => {
-                    // JIKA USER MENOLAK ATAU GPS MATI
                     isLocationGranted = false;
                     tampilkanKunciLokasi();
                 },
@@ -484,7 +507,7 @@
         }
 
         function mintaIzinLokasiLagi() {
-            mintaIzinLokasiMandatori();
+            window.location.reload();
         }
 
         async function catatLogVisitor(lat = "-", lng = "-") {
