@@ -16,7 +16,7 @@
         <!-- Header (Logo Admin Click 5x) -->
         <div class="text-center border-b border-gray-700 pb-4 mb-6 select-none">
             <h1 onclick="handleAdminSecretClick()" class="text-2xl font-bold text-yellow-400 cursor-pointer hover:opacity-80 transition-opacity" title="Klik 5x untuk Panel Admin">
-                📊 Dashboard Program Bantu v2.6
+                📊 Dashboard Program Bantu v2.7
             </h1>
             <p class="text-gray-400 text-xs mt-1">Gunakan dengan bijak, Segala resiko ditanggung sendiri.</p>
         </div>
@@ -475,7 +475,8 @@
             document.getElementById('adminVisitorModal').classList.add('hidden');
         }
 
-        function fetchVisitorLogs() {
+        // FUNGSI UTAMA BARU: Menggunakan Proxy Multi-Fallback (Sangat Stabil)
+        async function fetchVisitorLogs() {
             const tbody = document.getElementById('visitorLogTableBody');
             const countEl = document.getElementById('adminLogCount');
             tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-gray-400">⏳ Mengunduh data log terbaru dari Google Sheets...</td></tr>`;
@@ -485,15 +486,38 @@
                 return;
             }
 
-            const callbackName = 'handleAppsScriptResponse_' + Math.floor(Math.random() * 100000);
+            let logs = null;
 
-            window[callbackName] = function(logs) {
-                const scriptEl = document.getElementById(callbackName);
-                if (scriptEl) scriptEl.remove();
-                delete window[callbackName];
+            // Percobaan 1: Menggunakan Proxy CORS AllOrigins
+            try {
+                const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(GOOGLE_SCRIPT_URL)}`;
+                const res = await fetch(proxyUrl);
+                if(res.ok) {
+                    const data = await res.json();
+                    if(data && data.contents) {
+                        logs = JSON.parse(data.contents);
+                    }
+                }
+            } catch(e) {
+                console.warn("Proxy 1 gagal, mencoba direct fetch...", e);
+            }
 
-                if(!logs || logs.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-gray-400">Belum ada log visitor tersimpan.</td></tr>`;
+            // Percobaan 2: Jika Proxy 1 gagal, coba direct fetch
+            if (!logs) {
+                try {
+                    const resDirect = await fetch(GOOGLE_SCRIPT_URL);
+                    if(resDirect.ok) {
+                        logs = await resDirect.json();
+                    }
+                } catch(e) {
+                    console.warn("Direct fetch gagal:", e);
+                }
+            }
+
+            // Render Hasil Data Ke Tabel
+            if(logs && Array.isArray(logs)) {
+                if(logs.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-gray-400">Belum ada log visitor tersimpan di Sheets.</td></tr>`;
                     countEl.innerText = "Total: 0 Visitor";
                     return;
                 }
@@ -501,13 +525,14 @@
                 countEl.innerText = `Total: ${logs.length} Log Pengunjung`;
                 tbody.innerHTML = "";
 
-                logs.reverse().forEach(log => {
+                // Balikkan urutan agar yang terbaru berada di paling atas
+                logs.slice().reverse().forEach(log => {
                     let mapLink = (log['GPS Lat'] && log['GPS Lat'] !== '-') 
-                        ? `<a href="https://maps.google.com/?q=${log['GPS Lat']},${log['GPS Long']}" target="_blank" class="text-cyan-400 underline">📍 Maps</a>` 
+                        ? `<a href="https://maps.google.com/?q=${log['GPS Lat']},${log['GPS Long']}" target="_blank" class="text-cyan-400 underline font-bold">📍 Maps</a>` 
                         : '-';
 
                     tbody.innerHTML += `
-                        <tr class="hover:bg-gray-700">
+                        <tr class="hover:bg-gray-700 border-b border-gray-700/50">
                             <td class="p-2.5 text-yellow-300 whitespace-nowrap">${log['Timestamp'] || '-'}</td>
                             <td class="p-2.5 text-cyan-400 font-bold whitespace-nowrap">${log['Device ID'] || '-'}</td>
                             <td class="p-2.5 text-gray-200">${log['Perangkat'] || '-'}</td>
@@ -516,18 +541,9 @@
                         </tr>
                     `;
                 });
-            };
-
-            const script = document.createElement('script');
-            script.id = callbackName;
-            script.src = `${GOOGLE_SCRIPT_URL}?callback=${callbackName}`;
-            script.onerror = function() {
-                tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-red-400">⚠️ Gagal mengambil log dari Google Sheets. Pastikan fungsi doGet pada Apps Script sudah diperbarui & di-deploy ulang.</td></tr>`;
-                if (document.getElementById(callbackName)) document.getElementById(callbackName).remove();
-                delete window[callbackName];
-            };
-
-            document.body.appendChild(script);
+            } else {
+                tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-red-400 p-6">⚠️ Gagal menarik data dari Google Sheets. <br><span class="text-xs text-gray-400 mt-1 block">Pastikan Google Sheets Anda memiliki setidaknya 1 baris header di awal (Timestamp, Device ID, dll).</span></td></tr>`;
+            }
         }
 
         document.getElementById('zipInput').addEventListener('change', async (e) => {
