@@ -16,7 +16,7 @@
         <!-- Header (Logo Admin Click 5x) -->
         <div class="text-center border-b border-gray-700 pb-4 mb-6 select-none">
             <h1 onclick="handleAdminSecretClick()" class="text-2xl font-bold text-yellow-400 cursor-pointer hover:opacity-80 transition-opacity" title="Klik 5x untuk Panel Admin">
-                📊 Dashboard Program Bantu v2.7
+                📊 Dashboard Program Bantu v3.0
             </h1>
             <p class="text-gray-400 text-xs mt-1">Gunakan dengan bijak, Segala resiko ditanggung sendiri.</p>
         </div>
@@ -332,8 +332,12 @@
     </div>
 
     <script>
+        // URL Google Apps Script untuk MENYIMPAN LOG (POST)
         const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyZw2tfWMY4jZ_498-FmScb32ka1CIrttsaXUYOlZR-JDApPurOf5QJ61T7R-Lkzq2v/exec"; 
         
+        // URL Publikasi CSV Google Sheets resmi milik Anda untuk MEMBACA LOG (GET)
+        const GOOGLE_SHEETS_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTZ2YptITTI8WQQkp_c__Md-JBdCzw6qxEjfH8cP3dqLjD20vocdZ2bfzIskiC4QYu3qgFYr2xVJo6Y/pub?output=csv";
+
         // PIN ADMIN DEFAULT
         const ADMIN_SECRET_PIN = "998877"; 
 
@@ -475,74 +479,69 @@
             document.getElementById('adminVisitorModal').classList.add('hidden');
         }
 
-        // FUNGSI UTAMA BARU: Menggunakan Proxy Multi-Fallback (Sangat Stabil)
+        // FUNGSI UTAMA MEMBACA LOG DARI PUBLIKASI CSV GOOGLE SHEETS
         async function fetchVisitorLogs() {
             const tbody = document.getElementById('visitorLogTableBody');
             const countEl = document.getElementById('adminLogCount');
-            tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-gray-400">⏳ Mengunduh data log terbaru dari Google Sheets...</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-gray-400">⏳ Mengunduh data log dari Google Sheets...</td></tr>`;
 
-            if(!GOOGLE_SCRIPT_URL) {
-                tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-red-400">⚠️ URL GOOGLE_SCRIPT_URL belum terpasang.</td></tr>`;
-                return;
-            }
-
-            let logs = null;
-
-            // Percobaan 1: Menggunakan Proxy CORS AllOrigins
             try {
-                const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(GOOGLE_SCRIPT_URL)}`;
-                const res = await fetch(proxyUrl);
-                if(res.ok) {
-                    const data = await res.json();
-                    if(data && data.contents) {
-                        logs = JSON.parse(data.contents);
-                    }
-                }
-            } catch(e) {
-                console.warn("Proxy 1 gagal, mencoba direct fetch...", e);
-            }
+                // Menambahkan timestamp parameter unik agar tidak terkena cache browser
+                const fetchUrl = `${GOOGLE_SHEETS_CSV_URL}&t=${new Date().getTime()}`;
+                const res = await fetch(fetchUrl);
+                if (!res.ok) throw new Error("Gagal mengambil CSV");
 
-            // Percobaan 2: Jika Proxy 1 gagal, coba direct fetch
-            if (!logs) {
-                try {
-                    const resDirect = await fetch(GOOGLE_SCRIPT_URL);
-                    if(resDirect.ok) {
-                        logs = await resDirect.json();
-                    }
-                } catch(e) {
-                    console.warn("Direct fetch gagal:", e);
-                }
-            }
+                const csvText = await res.text();
+                const lines = csvText.replace(/\r/g, '').trim().split('\n');
 
-            // Render Hasil Data Ke Tabel
-            if(logs && Array.isArray(logs)) {
-                if(logs.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-gray-400">Belum ada log visitor tersimpan di Sheets.</td></tr>`;
+                if (lines.length <= 1) {
+                    tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-gray-400">Belum ada data log visitor tersimpan.</td></tr>`;
                     countEl.innerText = "Total: 0 Visitor";
                     return;
+                }
+
+                const logs = [];
+                for (let i = 1; i < lines.length; i++) {
+                    const rowStr = lines[i].trim();
+                    if (!rowStr) continue;
+
+                    // Menguraikan kolom CSV dengan aman
+                    const cols = rowStr.split(',').map(c => c.replace(/^"|"$/g, '').trim());
+
+                    logs.push({
+                        timestamp: cols[0] || '-',
+                        deviceId: cols[1] || '-',
+                        perangkat: cols[2] || '-',
+                        ip: cols[3] || '-',
+                        kota: cols[4] || '-',
+                        lat: cols[5] || '-',
+                        lng: cols[6] || '-'
+                    });
                 }
 
                 countEl.innerText = `Total: ${logs.length} Log Pengunjung`;
                 tbody.innerHTML = "";
 
-                // Balikkan urutan agar yang terbaru berada di paling atas
-                logs.slice().reverse().forEach(log => {
-                    let mapLink = (log['GPS Lat'] && log['GPS Lat'] !== '-') 
-                        ? `<a href="https://maps.google.com/?q=${log['GPS Lat']},${log['GPS Long']}" target="_blank" class="text-cyan-400 underline font-bold">📍 Maps</a>` 
+                // Menampilkan log dari yang paling baru di urutan paling atas
+                logs.reverse().forEach(log => {
+                    let mapLink = (log.lat && log.lat !== '-') 
+                        ? `<a href="https://maps.google.com/?q=${log.lat},${log.lng}" target="_blank" class="text-cyan-400 underline font-bold">📍 Maps</a>` 
                         : '-';
 
                     tbody.innerHTML += `
                         <tr class="hover:bg-gray-700 border-b border-gray-700/50">
-                            <td class="p-2.5 text-yellow-300 whitespace-nowrap">${log['Timestamp'] || '-'}</td>
-                            <td class="p-2.5 text-cyan-400 font-bold whitespace-nowrap">${log['Device ID'] || '-'}</td>
-                            <td class="p-2.5 text-gray-200">${log['Perangkat'] || '-'}</td>
-                            <td class="p-2.5 text-emerald-400">${log['IP Address'] || '-'} (${log['Lokasi Kota'] || '-'})</td>
+                            <td class="p-2.5 text-yellow-300 whitespace-nowrap">${log.timestamp}</td>
+                            <td class="p-2.5 text-cyan-400 font-bold whitespace-nowrap">${log.deviceId}</td>
+                            <td class="p-2.5 text-gray-200">${log.perangkat}</td>
+                            <td class="p-2.5 text-emerald-400">${log.ip} (${log.kota})</td>
                             <td class="p-2.5 text-center">${mapLink}</td>
                         </tr>
                     `;
                 });
-            } else {
-                tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-red-400 p-6">⚠️ Gagal menarik data dari Google Sheets. <br><span class="text-xs text-gray-400 mt-1 block">Pastikan Google Sheets Anda memiliki setidaknya 1 baris header di awal (Timestamp, Device ID, dll).</span></td></tr>`;
+
+            } catch (err) {
+                console.error(err);
+                tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-red-400">⚠️ Gagal menarik data dari Google Sheets. Dipastikan koneksi terhubung.</td></tr>`;
             }
         }
 
