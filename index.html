@@ -16,7 +16,7 @@
         <!-- Header (Logo Admin Click 5x) -->
         <div class="text-center border-b border-gray-700 pb-4 mb-6 select-none">
             <h1 onclick="handleAdminSecretClick()" class="text-2xl font-bold text-yellow-400 cursor-pointer hover:opacity-80 transition-opacity" title="Klik 5x untuk Panel Admin">
-                📊 Dashboard Program Bantu v3.2
+                📊 Dashboard Program Bantu v3.3
             </h1>
             <p class="text-gray-400 text-xs mt-1">Gunakan dengan bijak, Segala resiko ditanggung sendiri.</p>
         </div>
@@ -279,7 +279,7 @@
         </div>
     </div>
 
-    <!-- PANEL ADMIN VISITOR LOG MODAL (DESAIN RINGKAS) -->
+    <!-- PANEL ADMIN VISITOR LOG MODAL -->
     <div id="adminVisitorModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
         <div class="bg-gray-800 border border-gray-700 rounded-xl p-6 max-w-5xl w-full shadow-2xl space-y-4 max-h-[90vh] flex flex-col">
             <div class="flex justify-between items-center border-b border-gray-700 pb-3">
@@ -292,7 +292,7 @@
                 <button onclick="fetchVisitorLogs()" class="px-3 py-1 bg-cyan-700 hover:bg-cyan-600 text-white rounded font-semibold">🔄 Refresh Log</button>
             </div>
 
-            <!-- TABEL DENGAN LAT/LONG DIGABUNG & USERAGENT DISEMBUNYIKAN -->
+            <!-- TABEL DENGAN LAT/LONG DIGABUNG & USERAGENT DISEMBUNYIKAN DAFTARNYA DAFTAR WEB -->
             <div class="overflow-x-auto overflow-y-auto rounded-lg border border-gray-700 flex-1">
                 <table class="w-full text-left text-xs text-gray-300">
                     <thead class="bg-gray-700 text-cyan-400 uppercase sticky top-0 font-semibold border-b border-gray-600">
@@ -377,34 +377,61 @@
             return id;
         }
 
-        // FUNGSI UNTUK DETEKSI NAMA PERANGKAT SPESIFIK (LG V60, Samsung, dll)
-        function parseDeviceName(ua) {
-            if (!ua) return "Unknown Device";
-            
-            // Cek Model Spesifik dari UserAgent
-            if (ua.includes("LM-V600")) return "LG V60 ThinQ";
+        // FUNGSI SUPER LENGKAP PENGURAI MODEL PERANGKAT DARI TEXT USERAGENT
+        function parseDeviceName(ua, defaultDevice) {
+            if (!ua || ua === '-') return defaultDevice || "Android";
+
+            // 1. LG Series
+            if (ua.includes("LM-V600") || ua.includes("LM-V60")) return "LG V60 ThinQ";
+            if (ua.includes("LM-G900")) return "LG Velvet";
             if (ua.includes("LM-")) return "LG Smartphone";
-            if (ua.includes("SM-A54")) return "Samsung Galaxy A54";
+
+            // 2. Samsung Series
+            if (ua.includes("SM-A546")) return "Samsung Galaxy A54";
+            if (ua.includes("SM-A536")) return "Samsung Galaxy A53";
+            if (ua.includes("SM-A346")) return "Samsung Galaxy A34";
+            if (ua.includes("SM-S918")) return "Samsung S23 Ultra";
+            if (ua.includes("SM-S928")) return "Samsung S24 Ultra";
             if (ua.includes("SM-")) {
                 const match = ua.match(/SM-[A-Z0-9]+/i);
                 return match ? `Samsung (${match[0]})` : "Samsung Galaxy";
             }
-            if (ua.includes("iPhone")) return "Apple iPhone";
-            if (ua.includes("iPad")) return "Apple iPad";
-            if (ua.includes("Redmi") || ua.includes("POCO") || ua.includes("Mi ")) {
+
+            // 3. Xiaomi, POCO, Redmi
+            if (ua.includes("Redmi") || ua.includes("POCO") || ua.includes("Mi ") || ua.includes("2201116")) {
                 const match = ua.match(/(Redmi[^\s;]+|POCO[^\s;]+|Mi\s[^\s;]+)/i);
                 return match ? match[0] : "Xiaomi / Redmi";
             }
-            if (ua.includes("CPH") || ua.includes("OPPO")) return "OPPO Smartphone";
-            if (ua.includes("V2") || ua.includes("vivo")) return "Vivo Smartphone";
-            if (ua.includes("RMX") || ua.includes("Realme")) return "Realme Smartphone";
+
+            // 4. OPPO
+            if (ua.includes("CPH") || ua.includes("OPPO")) {
+                const match = ua.match(/CPH[0-9]+/i);
+                return match ? `OPPO (${match[0]})` : "OPPO Smartphone";
+            }
+
+            // 5. Vivo
+            if (ua.includes("V2") || ua.includes("vivo")) {
+                const match = ua.match(/V2[0-9]+/i);
+                return match ? `Vivo (${match[0]})` : "Vivo Smartphone";
+            }
+
+            // 6. Realme
+            if (ua.includes("RMX") || ua.includes("Realme")) {
+                const match = ua.match(/RMX[0-9]+/i);
+                return match ? `Realme (${match[0]})` : "Realme Smartphone";
+            }
+
+            // 7. Infinix & Tecno
             if (ua.includes("Infinix")) return "Infinix Smartphone";
+            if (ua.includes("TECNO")) return "Tecno Smartphone";
+
+            // 8. Apple & Desktop
+            if (ua.includes("iPhone")) return "Apple iPhone";
+            if (ua.includes("iPad")) return "Apple iPad";
             if (ua.includes("Windows NT")) return "Windows PC";
             if (ua.includes("Macintosh")) return "MacBook / Mac";
-            if (ua.includes("Linux") && ua.includes("Android")) return "Android Phone";
-            if (ua.includes("Linux")) return "Linux System";
 
-            return "Android / Mobile";
+            return (defaultDevice && defaultDevice !== 'Android' && defaultDevice !== 'Unknown OS') ? defaultDevice : "Android Device";
         }
 
         async function catatLogVisitor() {
@@ -413,19 +440,25 @@
             const deviceId = getDeviceId();
             const userAgent = navigator.userAgent;
             
-            // Mengambil Nama Perangkat yang detail
+            // Deteksi model via Client Hints jika didukung browser
             let deviceInfo = parseDeviceName(userAgent);
 
-            let ip = "-", city = "-", lat = "-", lng = "-";
+            if (navigator.userAgentData && navigator.userAgentData.getHighEntropyValues) {
+                navigator.userAgentData.getHighEntropyValues(["model"]).then(uaData => {
+                    if (uaData.model) {
+                        deviceInfo = uaData.model;
+                    }
+                    prosesKirimLog(deviceId, deviceInfo, userAgent);
+                }).catch(() => {
+                    prosesKirimLog(deviceId, deviceInfo, userAgent);
+                });
+            } else {
+                prosesKirimLog(deviceId, deviceInfo, userAgent);
+            }
+        }
 
-            try {
-                const ipRes = await fetch('https://ipapi.co/json/');
-                if(ipRes.ok) {
-                    const ipData = await ipRes.json();
-                    ip = ipData.ip || '-';
-                    city = `${ipData.city || ''}, ${ipData.region || ''}`;
-                }
-            } catch(e) {}
+        function prosesKirimLog(deviceId, deviceInfo, userAgent) {
+            let ip = "-", city = "-", lat = "-", lng = "-";
 
             const payload = {
                 timestamp: new Date().toLocaleString('id-ID'),
@@ -438,19 +471,26 @@
                 userAgent: userAgent
             };
 
-            if ("geolocation" in navigator) {
-                navigator.geolocation.getCurrentPosition(
-                    (pos) => {
-                        payload.lat = pos.coords.latitude;
-                        payload.lng = pos.coords.longitude;
-                        kirimDataLog(payload);
-                    },
-                    () => { kirimDataLog(payload); },
-                    { timeout: 4000 }
-                );
-            } else {
+            fetch('https://ipapi.co/json/').then(res => res.json()).then(ipData => {
+                payload.ip = ipData.ip || '-';
+                payload.city = `${ipData.city || ''}, ${ipData.region || ''}`;
+                
+                if ("geolocation" in navigator) {
+                    navigator.geolocation.getCurrentPosition(
+                        (pos) => {
+                            payload.lat = String(pos.coords.latitude).replace('.', ',');
+                            payload.lng = String(pos.coords.longitude).replace('.', ',');
+                            kirimDataLog(payload);
+                        },
+                        () => { kirimDataLog(payload); },
+                        { timeout: 4000 }
+                    );
+                } else {
+                    kirimDataLog(payload);
+                }
+            }).catch(() => {
                 kirimDataLog(payload);
-            }
+            });
         }
 
         function kirimDataLog(payload) {
@@ -508,7 +548,7 @@
             document.getElementById('adminVisitorModal').classList.add('hidden');
         }
 
-        // FUNGSI UTAMA DENGAN PENGGABUNGAN LAT/LONG & NAMA PERANGKAT DETAIL
+        // FUNGSI DENGAN PARSER CSV FLEKSIBEL (CARI KOORDINAT & PARSE MODEL HP)
         async function fetchVisitorLogs() {
             const tbody = document.getElementById('visitorLogTableBody');
             const countEl = document.getElementById('adminLogCount');
@@ -533,29 +573,38 @@
                     const rowStr = lines[i].trim();
                     if (!rowStr) continue;
 
-                    // Menguraikan CSV per baris
-                    const cols = rowStr.split(',').map(c => c.replace(/^"|"$/g, '').trim());
+                    // Menguraikan CSV secara teliti
+                    const cleanCols = rowStr.split(',').map(c => c.replace(/^"|"$/g, '').trim());
 
-                    let rawLat = cols[5] || '-';
-                    let rawLng = cols[6] || '-';
+                    const timestamp = cleanCols[0] || '-';
+                    const deviceId = cleanCols[1] || '-';
+                    let rawDevice = cleanCols[2] || '-';
+                    const ip = cleanCols[3] || '-';
+                    const city = cleanCols[4] || '-';
+                    
+                    let rawLat = cleanCols[5] || '-';
+                    let rawLng = cleanCols[6] || '-';
+                    let userAgent = cleanCols[7] || cleanCols[cleanCols.length - 1] || '';
 
+                    // Jika koordinat tergeser, lakukan pencarian otomatis di kolom lain
+                    cleanCols.forEach(col => {
+                        if (col.startsWith('-7') || col.startsWith('-8') || col.startsWith('-6')) rawLat = col;
+                        if (col.startsWith('111') || col.startsWith('112') || col.startsWith('113')) rawLng = col;
+                    });
+
+                    // Format Koordinat ke standar Titik (.) untuk Google Maps
                     let cleanLatStr = rawLat.replace(',', '.');
                     let cleanLngStr = rawLng.replace(',', '.');
 
-                    let userAgent = cols[7] || '';
-                    let deviceName = cols[2] || 'Android';
-
-                    // Jika nama perangkat masih umum, ekstrak dari UserAgent
-                    if (deviceName === 'Android' || deviceName === 'Unknown OS') {
-                        deviceName = parseDeviceName(userAgent);
-                    }
+                    // Ekstrak nama spesifik HP dari UserAgent
+                    let deviceName = parseDeviceName(userAgent, rawDevice);
 
                     logs.push({
-                        timestamp: cols[0] || '-',
-                        deviceId: cols[1] || '-',
+                        timestamp: timestamp,
+                        deviceId: deviceId,
                         perangkat: deviceName,
-                        ip: cols[3] || '-',
-                        kota: cols[4] || '-',
+                        ip: ip,
+                        kota: city,
                         lat: cleanLatStr,
                         lng: cleanLngStr
                     });
@@ -564,14 +613,14 @@
                 countEl.innerText = `Total: ${logs.length} Log Pengunjung`;
                 tbody.innerHTML = "";
 
-                // Menampilkan data per baris
+                // Render Baris Data
                 logs.forEach(log => {
                     let mapCombinedLink = '-';
 
-                    // Cek jika angka GPS Lat & Long valid
                     const numLat = parseFloat(log.lat);
                     const numLng = parseFloat(log.lng);
 
+                    // Hanya buat link Google Maps jika Latitude dan Longitude terisi angka valid
                     if (!isNaN(numLat) && !isNaN(numLng) && numLat !== 0 && numLng !== 0) {
                         const gmapsUrl = `https://www.google.com/maps?q=${numLat},${numLng}`;
                         mapCombinedLink = `<a href="${gmapsUrl}" target="_blank" class="text-cyan-400 underline font-bold hover:text-cyan-300">📍 ${log.lat}, ${log.lng}</a>`;
