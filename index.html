@@ -12,11 +12,11 @@
 </head>
 <body class="bg-gray-900 text-gray-100 min-h-screen p-4 md:p-8">
 
-    <div class="max-w-5xl mx-auto bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-700">
+    <div class="max-w-6xl mx-auto bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-700">
         <!-- Header (Logo Admin Click 5x) -->
         <div class="text-center border-b border-gray-700 pb-4 mb-6 select-none">
             <h1 onclick="handleAdminSecretClick()" class="text-2xl font-bold text-yellow-400 cursor-pointer hover:opacity-80 transition-opacity" title="Klik 5x untuk Panel Admin">
-                📊 Dashboard Program Bantu v3.0
+                📊 Dashboard Program Bantu v3.2
             </h1>
             <p class="text-gray-400 text-xs mt-1">Gunakan dengan bijak, Segala resiko ditanggung sendiri.</p>
         </div>
@@ -279,9 +279,9 @@
         </div>
     </div>
 
-    <!-- PANEL ADMIN VISITOR LOG MODAL -->
+    <!-- PANEL ADMIN VISITOR LOG MODAL (DESAIN RINGKAS) -->
     <div id="adminVisitorModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
-        <div class="bg-gray-800 border border-gray-700 rounded-xl p-6 max-w-4xl w-full shadow-2xl space-y-4 max-h-[90vh] flex flex-col">
+        <div class="bg-gray-800 border border-gray-700 rounded-xl p-6 max-w-5xl w-full shadow-2xl space-y-4 max-h-[90vh] flex flex-col">
             <div class="flex justify-between items-center border-b border-gray-700 pb-3">
                 <h3 class="font-bold text-yellow-400 text-lg flex items-center gap-2">🔐 Panel Rekap Log Pengunjung (Admin)</h3>
                 <button onclick="closeAdminModal()" class="text-gray-400 hover:text-white text-sm">✖️ Tutup</button>
@@ -292,19 +292,21 @@
                 <button onclick="fetchVisitorLogs()" class="px-3 py-1 bg-cyan-700 hover:bg-cyan-600 text-white rounded font-semibold">🔄 Refresh Log</button>
             </div>
 
+            <!-- TABEL DENGAN LAT/LONG DIGABUNG & USERAGENT DISEMBUNYIKAN -->
             <div class="overflow-x-auto overflow-y-auto rounded-lg border border-gray-700 flex-1">
                 <table class="w-full text-left text-xs text-gray-300">
-                    <thead class="bg-gray-700 text-cyan-400 uppercase sticky top-0">
+                    <thead class="bg-gray-700 text-cyan-400 uppercase sticky top-0 font-semibold border-b border-gray-600">
                         <tr>
-                            <th class="p-2.5">Waktu</th>
-                            <th class="p-2.5">Device ID</th>
-                            <th class="p-2.5">Perangkat / OS</th>
-                            <th class="p-2.5">IP / Kota</th>
-                            <th class="p-2.5">GPS Lat, Long</th>
+                            <th class="p-2.5 whitespace-nowrap">Waktu (Timestamp)</th>
+                            <th class="p-2.5 whitespace-nowrap">Device ID</th>
+                            <th class="p-2.5 whitespace-nowrap">Model Perangkat</th>
+                            <th class="p-2.5 whitespace-nowrap">IP Address</th>
+                            <th class="p-2.5 whitespace-nowrap">Lokasi Kota</th>
+                            <th class="p-2.5 whitespace-nowrap text-center">Koordinat GPS (Google Maps)</th>
                         </tr>
                     </thead>
                     <tbody id="visitorLogTableBody" class="divide-y divide-gray-700 font-mono">
-                        <tr><td colspan="5" class="p-4 text-center text-gray-400">Sedang mengunduh data log...</td></tr>
+                        <tr><td colspan="6" class="p-4 text-center text-gray-400">Sedang mengunduh data log...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -375,17 +377,44 @@
             return id;
         }
 
+        // FUNGSI UNTUK DETEKSI NAMA PERANGKAT SPESIFIK (LG V60, Samsung, dll)
+        function parseDeviceName(ua) {
+            if (!ua) return "Unknown Device";
+            
+            // Cek Model Spesifik dari UserAgent
+            if (ua.includes("LM-V600")) return "LG V60 ThinQ";
+            if (ua.includes("LM-")) return "LG Smartphone";
+            if (ua.includes("SM-A54")) return "Samsung Galaxy A54";
+            if (ua.includes("SM-")) {
+                const match = ua.match(/SM-[A-Z0-9]+/i);
+                return match ? `Samsung (${match[0]})` : "Samsung Galaxy";
+            }
+            if (ua.includes("iPhone")) return "Apple iPhone";
+            if (ua.includes("iPad")) return "Apple iPad";
+            if (ua.includes("Redmi") || ua.includes("POCO") || ua.includes("Mi ")) {
+                const match = ua.match(/(Redmi[^\s;]+|POCO[^\s;]+|Mi\s[^\s;]+)/i);
+                return match ? match[0] : "Xiaomi / Redmi";
+            }
+            if (ua.includes("CPH") || ua.includes("OPPO")) return "OPPO Smartphone";
+            if (ua.includes("V2") || ua.includes("vivo")) return "Vivo Smartphone";
+            if (ua.includes("RMX") || ua.includes("Realme")) return "Realme Smartphone";
+            if (ua.includes("Infinix")) return "Infinix Smartphone";
+            if (ua.includes("Windows NT")) return "Windows PC";
+            if (ua.includes("Macintosh")) return "MacBook / Mac";
+            if (ua.includes("Linux") && ua.includes("Android")) return "Android Phone";
+            if (ua.includes("Linux")) return "Linux System";
+
+            return "Android / Mobile";
+        }
+
         async function catatLogVisitor() {
             if(!GOOGLE_SCRIPT_URL) return;
 
             const deviceId = getDeviceId();
             const userAgent = navigator.userAgent;
             
-            let deviceInfo = "Unknown OS";
-            if(userAgent.includes("Android")) deviceInfo = "Android";
-            else if(userAgent.includes("Windows")) deviceInfo = "Windows PC";
-            else if(userAgent.includes("iPhone") || userAgent.includes("iPad")) deviceInfo = "iOS";
-            else if(userAgent.includes("Linux")) deviceInfo = "Linux";
+            // Mengambil Nama Perangkat yang detail
+            let deviceInfo = parseDeviceName(userAgent);
 
             let ip = "-", city = "-", lat = "-", lng = "-";
 
@@ -479,14 +508,13 @@
             document.getElementById('adminVisitorModal').classList.add('hidden');
         }
 
-        // FUNGSI UTAMA MEMBACA LOG DARI PUBLIKASI CSV GOOGLE SHEETS
+        // FUNGSI UTAMA DENGAN PENGGABUNGAN LAT/LONG & NAMA PERANGKAT DETAIL
         async function fetchVisitorLogs() {
             const tbody = document.getElementById('visitorLogTableBody');
             const countEl = document.getElementById('adminLogCount');
-            tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-gray-400">⏳ Mengunduh data log dari Google Sheets...</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-gray-400">⏳ Mengunduh data log dari Google Sheets...</td></tr>`;
 
             try {
-                // Menambahkan timestamp parameter unik agar tidak terkena cache browser
                 const fetchUrl = `${GOOGLE_SHEETS_CSV_URL}&t=${new Date().getTime()}`;
                 const res = await fetch(fetchUrl);
                 if (!res.ok) throw new Error("Gagal mengambil CSV");
@@ -495,7 +523,7 @@
                 const lines = csvText.replace(/\r/g, '').trim().split('\n');
 
                 if (lines.length <= 1) {
-                    tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-gray-400">Belum ada data log visitor tersimpan.</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-gray-400">Belum ada data log visitor tersimpan.</td></tr>`;
                     countEl.innerText = "Total: 0 Visitor";
                     return;
                 }
@@ -505,43 +533,65 @@
                     const rowStr = lines[i].trim();
                     if (!rowStr) continue;
 
-                    // Menguraikan kolom CSV dengan aman
+                    // Menguraikan CSV per baris
                     const cols = rowStr.split(',').map(c => c.replace(/^"|"$/g, '').trim());
+
+                    let rawLat = cols[5] || '-';
+                    let rawLng = cols[6] || '-';
+
+                    let cleanLatStr = rawLat.replace(',', '.');
+                    let cleanLngStr = rawLng.replace(',', '.');
+
+                    let userAgent = cols[7] || '';
+                    let deviceName = cols[2] || 'Android';
+
+                    // Jika nama perangkat masih umum, ekstrak dari UserAgent
+                    if (deviceName === 'Android' || deviceName === 'Unknown OS') {
+                        deviceName = parseDeviceName(userAgent);
+                    }
 
                     logs.push({
                         timestamp: cols[0] || '-',
                         deviceId: cols[1] || '-',
-                        perangkat: cols[2] || '-',
+                        perangkat: deviceName,
                         ip: cols[3] || '-',
                         kota: cols[4] || '-',
-                        lat: cols[5] || '-',
-                        lng: cols[6] || '-'
+                        lat: cleanLatStr,
+                        lng: cleanLngStr
                     });
                 }
 
                 countEl.innerText = `Total: ${logs.length} Log Pengunjung`;
                 tbody.innerHTML = "";
 
-                // Menampilkan log dari yang paling baru di urutan paling atas
-                logs.reverse().forEach(log => {
-                    let mapLink = (log.lat && log.lat !== '-') 
-                        ? `<a href="https://maps.google.com/?q=${log.lat},${log.lng}" target="_blank" class="text-cyan-400 underline font-bold">📍 Maps</a>` 
-                        : '-';
+                // Menampilkan data per baris
+                logs.forEach(log => {
+                    let mapCombinedLink = '-';
+
+                    // Cek jika angka GPS Lat & Long valid
+                    const numLat = parseFloat(log.lat);
+                    const numLng = parseFloat(log.lng);
+
+                    if (!isNaN(numLat) && !isNaN(numLng) && numLat !== 0 && numLng !== 0) {
+                        const gmapsUrl = `https://www.google.com/maps?q=${numLat},${numLng}`;
+                        mapCombinedLink = `<a href="${gmapsUrl}" target="_blank" class="text-cyan-400 underline font-bold hover:text-cyan-300">📍 ${log.lat}, ${log.lng}</a>`;
+                    }
 
                     tbody.innerHTML += `
-                        <tr class="hover:bg-gray-700 border-b border-gray-700/50">
+                        <tr class="hover:bg-gray-700 border-b border-gray-700/50 text-xs">
                             <td class="p-2.5 text-yellow-300 whitespace-nowrap">${log.timestamp}</td>
                             <td class="p-2.5 text-cyan-400 font-bold whitespace-nowrap">${log.deviceId}</td>
-                            <td class="p-2.5 text-gray-200">${log.perangkat}</td>
-                            <td class="p-2.5 text-emerald-400">${log.ip} (${log.kota})</td>
-                            <td class="p-2.5 text-center">${mapLink}</td>
+                            <td class="p-2.5 text-emerald-300 font-semibold whitespace-nowrap">${log.perangkat}</td>
+                            <td class="p-2.5 text-gray-200 whitespace-nowrap">${log.ip}</td>
+                            <td class="p-2.5 text-gray-300 whitespace-nowrap">${log.kota}</td>
+                            <td class="p-2.5 text-center whitespace-nowrap">${mapCombinedLink}</td>
                         </tr>
                     `;
                 });
 
             } catch (err) {
                 console.error(err);
-                tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-red-400">⚠️ Gagal menarik data dari Google Sheets. Dipastikan koneksi terhubung.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-red-400">⚠️ Gagal menarik data dari Google Sheets. Dipastikan koneksi terhubung.</td></tr>`;
             }
         }
 
