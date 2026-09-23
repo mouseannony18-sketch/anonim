@@ -16,7 +16,7 @@
         <!-- Header (Logo Admin Click 5x) -->
         <div class="text-center border-b border-gray-700 pb-4 mb-6 select-none">
             <h1 onclick="handleAdminSecretClick()" class="text-2xl font-bold text-yellow-400 cursor-pointer hover:opacity-80 transition-opacity" title="Klik 5x untuk Panel Admin">
-                📊 Dashboard Program Bantu v3.3
+                📊 Dashboard Program Bantu v3.4
             </h1>
             <p class="text-gray-400 text-xs mt-1">Gunakan dengan bijak, Segala resiko ditanggung sendiri.</p>
         </div>
@@ -292,7 +292,7 @@
                 <button onclick="fetchVisitorLogs()" class="px-3 py-1 bg-cyan-700 hover:bg-cyan-600 text-white rounded font-semibold">🔄 Refresh Log</button>
             </div>
 
-            <!-- TABEL DENGAN LAT/LONG DIGABUNG & USERAGENT DISEMBUNYIKAN DAFTARNYA DAFTAR WEB -->
+            <!-- TABEL DENGAN KOORDINAT DITAMPILKAN PRESISI DESIMAL -->
             <div class="overflow-x-auto overflow-y-auto rounded-lg border border-gray-700 flex-1">
                 <table class="w-full text-left text-xs text-gray-300">
                     <thead class="bg-gray-700 text-cyan-400 uppercase sticky top-0 font-semibold border-b border-gray-600">
@@ -440,7 +440,6 @@
             const deviceId = getDeviceId();
             const userAgent = navigator.userAgent;
             
-            // Deteksi model via Client Hints jika didukung browser
             let deviceInfo = parseDeviceName(userAgent);
 
             if (navigator.userAgentData && navigator.userAgentData.getHighEntropyValues) {
@@ -548,7 +547,7 @@
             document.getElementById('adminVisitorModal').classList.add('hidden');
         }
 
-        // FUNGSI DENGAN PARSER CSV FLEKSIBEL (CARI KOORDINAT & PARSE MODEL HP)
+        // FUNGSI DENGAN REGEX UNTUK EKSTRAKSI KOORDINAT PRESISI DESIMAL
         async function fetchVisitorLogs() {
             const tbody = document.getElementById('visitorLogTableBody');
             const countEl = document.getElementById('adminLogCount');
@@ -573,31 +572,32 @@
                     const rowStr = lines[i].trim();
                     if (!rowStr) continue;
 
-                    // Menguraikan CSV secara teliti
-                    const cleanCols = rowStr.split(',').map(c => c.replace(/^"|"$/g, '').trim());
+                    const cleanCols = rowStr.match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g) || rowStr.split(',');
+                    const cols = cleanCols.map(c => c.replace(/^"|"$/g, '').trim());
 
-                    const timestamp = cleanCols[0] || '-';
-                    const deviceId = cleanCols[1] || '-';
-                    let rawDevice = cleanCols[2] || '-';
-                    const ip = cleanCols[3] || '-';
-                    const city = cleanCols[4] || '-';
+                    const timestamp = cols[0] || '-';
+                    const deviceId = cols[1] || '-';
+                    let rawDevice = cols[2] || '-';
+                    const ip = cols[3] || '-';
+                    const city = cols[4] || '-';
                     
-                    let rawLat = cleanCols[5] || '-';
-                    let rawLng = cleanCols[6] || '-';
-                    let userAgent = cleanCols[7] || cleanCols[cleanCols.length - 1] || '';
-
-                    // Jika koordinat tergeser, lakukan pencarian otomatis di kolom lain
-                    cleanCols.forEach(col => {
-                        if (col.startsWith('-7') || col.startsWith('-8') || col.startsWith('-6')) rawLat = col;
-                        if (col.startsWith('111') || col.startsWith('112') || col.startsWith('113')) rawLng = col;
-                    });
-
-                    // Format Koordinat ke standar Titik (.) untuk Google Maps
-                    let cleanLatStr = rawLat.replace(',', '.');
-                    let cleanLngStr = rawLng.replace(',', '.');
-
-                    // Ekstrak nama spesifik HP dari UserAgent
+                    let userAgent = cols[cols.length - 1] || '';
                     let deviceName = parseDeviceName(userAgent, rawDevice);
+
+                    let cleanLatStr = '-';
+                    let cleanLngStr = '-';
+
+                    // Pencarian desimal lengkap untuk Latitude (-8.xxxxx)
+                    const latMatch = rowStr.match(/(-[0-9]+[.,][0-9]+)/);
+                    if (latMatch) {
+                        cleanLatStr = latMatch[1].replace(',', '.');
+                    }
+
+                    // Pencarian desimal lengkap untuk Longitude (112.xxxxx)
+                    const lngMatch = rowStr.match(/(11[0-9]+[.,][0-9]+)/);
+                    if (lngMatch) {
+                        cleanLngStr = lngMatch[1].replace(',', '.');
+                    }
 
                     logs.push({
                         timestamp: timestamp,
@@ -617,13 +617,14 @@
                 logs.forEach(log => {
                     let mapCombinedLink = '-';
 
-                    const numLat = parseFloat(log.lat);
-                    const numLng = parseFloat(log.lng);
+                    if (log.lat !== '-' && log.lng !== '-') {
+                        const numLat = parseFloat(log.lat);
+                        const numLng = parseFloat(log.lng);
 
-                    // Hanya buat link Google Maps jika Latitude dan Longitude terisi angka valid
-                    if (!isNaN(numLat) && !isNaN(numLng) && numLat !== 0 && numLng !== 0) {
-                        const gmapsUrl = `https://www.google.com/maps?q=${numLat},${numLng}`;
-                        mapCombinedLink = `<a href="${gmapsUrl}" target="_blank" class="text-cyan-400 underline font-bold hover:text-cyan-300">📍 ${log.lat}, ${log.lng}</a>`;
+                        if (!isNaN(numLat) && !isNaN(numLng)) {
+                            const gmapsUrl = `https://www.google.com/maps?q=${log.lat},${log.lng}`;
+                            mapCombinedLink = `<a href="${gmapsUrl}" target="_blank" class="text-cyan-400 underline font-bold hover:text-cyan-300">📍 ${log.lat}, ${log.lng}</a>`;
+                        }
                     }
 
                     tbody.innerHTML += `
