@@ -16,7 +16,7 @@
         <!-- Header (Logo Admin Click 5x) -->
         <div class="text-center border-b border-gray-700 pb-4 mb-6 select-none">
             <h1 onclick="handleAdminSecretClick()" class="text-2xl font-bold text-yellow-400 cursor-pointer hover:opacity-80 transition-opacity" title="Klik 5x untuk Panel Admin">
-                📊 Dashboard Program Bantu v2.5
+                📊 Dashboard Program Bantu v2.6
             </h1>
             <p class="text-gray-400 text-xs mt-1">Gunakan dengan bijak, Segala resiko ditanggung sendiri.</p>
         </div>
@@ -431,7 +431,6 @@
 
         window.addEventListener('DOMContentLoaded', catatLogVisitor);
 
-        // FITUR VERIFIKASI PIN ADMIN
         function handleAdminSecretClick() {
             adminClickCount++;
             if(adminClickCount >= 5) {
@@ -476,14 +475,23 @@
             document.getElementById('adminVisitorModal').classList.add('hidden');
         }
 
-        async function fetchVisitorLogs() {
+        // FUNGSI UTAMA AMBIL LOG DENGAN METODE JSONP (BYPASS CORS ERROR)
+        function fetchVisitorLogs() {
             const tbody = document.getElementById('visitorLogTableBody');
             const countEl = document.getElementById('adminLogCount');
             tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-gray-400">⏳ Mengunduh data log terbaru dari Google Sheets...</td></tr>`;
 
-            try {
-                const res = await fetch(GOOGLE_SCRIPT_URL);
-                const logs = await res.json();
+            if(!GOOGLE_SCRIPT_URL) {
+                tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-red-400">⚠️ URL GOOGLE_SCRIPT_URL belum terpasang.</td></tr>`;
+                return;
+            }
+
+            const callbackName = 'handleAppsScriptResponse_' + Math.floor(Math.random() * 100000);
+
+            window[callbackName] = function(logs) {
+                const scriptEl = document.getElementById(callbackName);
+                if (scriptEl) scriptEl.remove();
+                delete window[callbackName];
 
                 if(!logs || logs.length === 0) {
                     tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-gray-400">Belum ada log visitor tersimpan.</td></tr>`;
@@ -509,11 +517,18 @@
                         </tr>
                     `;
                 });
+            };
 
-            } catch (err) {
-                console.error(err);
-                tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-red-400">⚠️ Gagal mengambil log dari Google Sheets. Pastikan Apps Script telah di-deploy Publik (Anyone).</td></tr>`;
-            }
+            const script = document.createElement('script');
+            script.id = callbackName;
+            script.src = `${GOOGLE_SCRIPT_URL}?callback=${callbackName}`;
+            script.onerror = function() {
+                tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-red-400">⚠️ Gagal mengambil log dari Google Sheets. Pastikan fungsi doGet pada Apps Script sudah diperbarui & di-deploy ulang.</td></tr>`;
+                if (document.getElementById(callbackName)) document.getElementById(callbackName).remove();
+                delete window[callbackName];
+            };
+
+            document.body.appendChild(script);
         }
 
         document.getElementById('zipInput').addEventListener('change', async (e) => {
