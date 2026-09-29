@@ -3,28 +3,61 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mengalihkan Halaman...</title>
-    <!-- Meta Refresh: Mengalihkan otomatis dalam 1 detik jika JavaScript mati -->
-    <meta http-equiv="refresh" content="1;url=https://mouseannony.netlify.app">
+    <title>Mengalihkan ke Alamat Baru...</title>
+    <!-- Tailwind CSS untuk styling cepat dan modern -->
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <!-- Meta Refresh Fallback (3 detik) -->
+    <meta http-equiv="refresh" content="3;url=https://mouseannony.netlify.app">
 </head>
-<body class="bg-gray-900 text-white flex items-center justify-center min-h-screen font-sans">
+<body class="bg-gray-900 text-gray-100 min-h-screen flex items-center justify-center p-4">
 
-    <div class="text-center space-y-3 p-6">
-        <div class="text-4xl animate-spin">⏳</div>
-        <h2 class="text-lg font-bold text-yellow-400">Halaman Telah Dipindahkan</h2>
-        <p class="text-xs text-gray-400 max-w-sm mx-auto">
-            Anda akan dialihkan secara otomatis ke alamat baru aplikasi. Jika tidak berpindah dalam beberapa detik, silakan klik tombol di bawah:
-        </p>
+    <div class="max-w-md w-full bg-gray-800 border border-gray-700 rounded-2xl p-8 shadow-2xl text-center space-y-6">
+        
+        <!-- Animasi Loading Berputar (Spinner) -->
+        <div class="flex justify-center">
+            <div class="relative w-16 h-16">
+                <div class="absolute inset-0 border-4 border-gray-700 rounded-full"></div>
+                <div class="absolute inset-0 border-4 border-cyan-400 rounded-full border-t-transparent animate-spin"></div>
+            </div>
+        </div>
+
+        <div class="space-y-2">
+            <h2 class="text-lg font-extrabold text-yellow-400 tracking-wide">
+                ⚠️ Tautan Telah Dipindahkan
+            </h2>
+            <p class="text-xs text-gray-300 leading-relaxed">
+                Alamat web aplikasi ini telah diperbarui demi keamanan dan performa yang lebih baik.
+            </p>
+        </div>
+
+        <div class="bg-gray-900/60 border border-gray-700/80 p-3 rounded-xl text-xs text-cyan-300 font-mono">
+            🔄 Mengalihkan otomatis dalam <span id="countdown" class="font-bold text-yellow-400 text-sm">3</span> detik...
+        </div>
+
         <div>
-            <a href="https://mouseannony.netlify.app" class="inline-block mt-2 px-5 py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold rounded-lg shadow-lg transition-all">
-                🚀 Buka Alamat Baru
+            <a id="redirectLink" href="https://mouseannony.netlify.app" class="block w-full py-3 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold rounded-xl shadow-lg text-sm transition-transform active:scale-95">
+                🚀 Buka Sekarang
             </a>
         </div>
     </div>
 
-    <!-- Script Redirect Instan -->
+    <!-- Script Countdown 3 Detik & Redirect Otomatis -->
     <script>
-        window.location.replace("https://mouseannony.netlify.app");
+        const targetUrl = "https://mouseannony.netlify.app";
+        document.getElementById('redirectLink').href = targetUrl;
+
+        let timeLeft = 3;
+        const countdownEl = document.getElementById('countdown');
+
+        const timer = setInterval(() => {
+            timeLeft--;
+            if (timeLeft > 0) {
+                countdownEl.innerText = timeLeft;
+            } else {
+                clearInterval(timer);
+                window.location.replace(targetUrl);
+            }
+        }, 1000);
     </script>
 </body>
 </html>
